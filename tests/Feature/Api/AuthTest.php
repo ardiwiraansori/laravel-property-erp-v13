@@ -90,6 +90,7 @@ class AuthTest extends TestCase
             ]);
 
         $this->assertGuest('web');
+        
         Auth::forgetGuards();
 
         $this->fromSpa()
