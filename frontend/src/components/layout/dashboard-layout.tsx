@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react'
+import { Outlet } from 'react-router'
 
 import { AppSidebar } from '@/components/app-sidebar'
+import { ApiHealthStatus } from '@/components/dashboard/api-health-status'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { TopbarUserMenu } from '@/components/layout/topbar-user-menu'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -8,28 +10,15 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
-import { ApiHealthStatus } from '@/components/dashboard/api-health-status'
-import { ThemeToggle } from '@/components/layout/theme-toggle'
+import { useAuth } from '@/features/auth/auth-state'
 
-type DashboardUser = {
-  id: number
-  name: string
-  email: string
-}
+export function DashboardLayout() {
+  const { user, submitting, logout } = useAuth()
 
-type DashboardLayoutProps = {
-  children: ReactNode
-  user: DashboardUser
-  loggingOut: boolean
-  onLogout: () => void
-}
+  if (!user) {
+    return null
+  }
 
-export function DashboardLayout({
-  children,
-  user,
-  loggingOut,
-  onLogout,
-}: DashboardLayoutProps) {
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -41,7 +30,9 @@ export function DashboardLayout({
           <Separator orientation="vertical" className="mr-2 h-4" />
 
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">Property ERP</p>
+            <p className="truncate text-sm font-medium">
+              Property ERP
+            </p>
 
             <p className="hidden truncate text-xs text-muted-foreground sm:block">
               Full-Stack Portfolio
@@ -57,13 +48,15 @@ export function DashboardLayout({
 
             <TopbarUserMenu
               user={user}
-              loggingOut={loggingOut}
-              onLogout={onLogout}
+              loggingOut={submitting}
+              onLogout={() => void logout()}
             />
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
+        <div className="flex flex-1 flex-col gap-4 p-4">
+          <Outlet />
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

@@ -15,18 +15,15 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { useAuth } from '@/features/auth/auth-state'
 
-type DashboardUser = {
-  id: number
-  name: string
-  email: string
-}
+export function DashboardPage() {
+  const { user } = useAuth()
 
-type DashboardPageProps = {
-  user: DashboardUser
-}
+  if (!user) {
+    return null
+  }
 
-export function DashboardPage({ user }: DashboardPageProps) {
   return (
     <div className="space-y-6">
       <div>

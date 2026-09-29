@@ -1,11 +1,7 @@
 import {
-  BarChart3,
-  Building2,
-  Calculator,
-  LayoutDashboard,
-  Settings2,
-  Users,
-} from 'lucide-react'
+  Link,
+  useLocation,
+} from 'react-router'
 
 import {
   Sidebar,
@@ -18,43 +14,20 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar'
-
-const navigationItems = [
-  {
-    title: 'Dashboard',
-    icon: LayoutDashboard,
-    active: true,
-    available: true,
-  },
-  {
-    title: 'Master Data',
-    icon: Building2,
-    available: false,
-  },
-  {
-    title: 'CRM',
-    icon: Users,
-    available: false,
-  },
-  {
-    title: 'Sales',
-    icon: BarChart3,
-    available: false,
-  },
-  {
-    title: 'Accounting',
-    icon: Calculator,
-    available: false,
-  },
-  {
-    title: 'Reports',
-    icon: Settings2,
-    available: false,
-  },
-]
+import { navigationItems } from '@/config/navigation'
 
 export function AppSidebar() {
+  const location = useLocation()
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  function handleNavigation() {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -70,7 +43,9 @@ export function AppSidebar() {
               </div>
 
               <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate font-semibold">Property ERP</span>
+                <span className="truncate font-semibold">
+                  Property ERP
+                </span>
 
                 <span className="truncate text-xs text-sidebar-foreground/70">
                   Management System
@@ -87,29 +62,42 @@ export function AppSidebar() {
 
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    tooltip={
-                      item.available ? item.title : `${item.title} · Planned`
-                    }
-                    isActive={item.active}
-                    className={
-                      !item.available ? 'cursor-default opacity-50' : undefined
-                    }
-                  >
-                    <item.icon />
+              {navigationItems.map((item) => {
+                const isActive =
+                  location.pathname === item.href ||
+                  (item.href !== '/dashboard' &&
+                    location.pathname.startsWith(`${item.href}/`))
 
-                    <span>{item.title}</span>
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      render={
+                        <Link
+                          to={item.href}
+                          onClick={handleNavigation}
+                          aria-current={isActive ? 'page' : undefined}
+                        />
+                      }
+                      tooltip={
+                        item.planned
+                          ? `${item.title} · Planned`
+                          : item.title
+                      }
+                      isActive={isActive}
+                    >
+                      <item.icon />
 
-                    {!item.available && (
-                      <span className="ml-auto text-[10px] uppercase tracking-wide text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden">
-                        Planned
-                      </span>
-                    )}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                      <span>{item.title}</span>
+
+                      {item.planned && (
+                        <span className="ml-auto text-[10px] uppercase tracking-wide text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden">
+                          Planned
+                        </span>
+                      )}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
