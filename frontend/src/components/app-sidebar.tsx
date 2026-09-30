@@ -1,7 +1,4 @@
-import {
-  Link,
-  useLocation,
-} from 'react-router'
+import { Link, useLocation } from 'react-router'
 
 import {
   Sidebar,
@@ -17,10 +14,21 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { navigationItems } from '@/config/navigation'
+import { useAuth } from '@/features/auth/auth-state'
+import { hasPermission } from '@/features/auth/permissions'
 
 export function AppSidebar() {
   const location = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
+  const { user } = useAuth()
+
+  if (!user) {
+    return null
+  }
+
+  const accessibleNavigationItems = navigationItems.filter((item) =>
+    hasPermission(user.permissions, item.permission),
+  )
 
   function handleNavigation() {
     if (isMobile) {
@@ -43,9 +51,7 @@ export function AppSidebar() {
               </div>
 
               <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate font-semibold">
-                  Property ERP
-                </span>
+                <span className="truncate font-semibold">Property ERP</span>
 
                 <span className="truncate text-xs text-sidebar-foreground/70">
                   Management System
@@ -62,7 +68,7 @@ export function AppSidebar() {
 
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map((item) => {
+              {accessibleNavigationItems.map((item) => {
                 const isActive =
                   location.pathname === item.href ||
                   (item.href !== '/dashboard' &&
@@ -79,9 +85,7 @@ export function AppSidebar() {
                         />
                       }
                       tooltip={
-                        item.planned
-                          ? `${item.title} · Planned`
-                          : item.title
+                        item.planned ? `${item.title} · Planned` : item.title
                       }
                       isActive={isActive}
                     >

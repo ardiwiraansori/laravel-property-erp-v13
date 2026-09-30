@@ -4,6 +4,8 @@ export type AuthUser = {
   id: number
   name: string
   email: string
+  roles: string[]
+  permissions: string[]
 }
 
 export type LoginCredentials = {

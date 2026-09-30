@@ -1,9 +1,5 @@
 import axios from 'axios'
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import {
@@ -12,6 +8,9 @@ import {
   type LoginCredentials,
 } from '@/features/auth/auth-state'
 import { api } from '@/lib/api'
+type AuthUserResponse = {
+  data: AuthUser
+}
 
 function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -34,10 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function loadAuthenticatedUser() {
       try {
-        const response = await api.get<AuthUser>('/api/user')
+        const response = await api.get<AuthUserResponse>('/api/user')
 
         if (active) {
-          setUser(response.data)
+          setUser(response.data.data)
         }
       } catch (error) {
         const isUnauthenticated =
@@ -70,9 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         await api.post('/api/login', credentials)
 
-        const response = await api.get<AuthUser>('/api/user')
+        const response = await api.get<AuthUserResponse>('/api/user')
 
-        setUser(response.data)
+        setUser(response.data.data)
 
         return true
       } catch (error) {

@@ -2,10 +2,14 @@
 
 namespace Tests\Feature\Api;
 
+use App\Enums\PermissionName;
+use App\Enums\RoleName;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use Illuminate\Support\Facades\Auth;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
@@ -48,6 +52,20 @@ class AuthTest extends TestCase
             'password' => 'password',
         ]);
 
+        $permission = Permission::findOrCreate(
+            PermissionName::DashboardView->value,
+            'web',
+        );
+
+        $role = Role::findOrCreate(
+            RoleName::Owner->value,
+            'web',
+        );
+
+        $role->givePermissionTo($permission);
+
+        $user->assignRole($role);
+
         $loginResponse = $this->fromSpa()->postJson('/api/login', [
             'email' => 'ardi@example.com',
             'password' => 'password',
@@ -56,7 +74,12 @@ class AuthTest extends TestCase
         $loginResponse
             ->assertOk()
             ->assertJsonPath('message', 'Login successful.')
-            ->assertJsonPath('user.email', $user->email);
+            ->assertJsonPath('user.email', $user->email)
+            ->assertJsonPath('user.roles.0', RoleName::Owner->value)
+            ->assertJsonPath(
+                'user.permissions.0',
+                PermissionName::DashboardView->value,
+            );
 
         $this->assertAuthenticatedAs($user);
 
@@ -64,7 +87,12 @@ class AuthTest extends TestCase
 
         $userResponse
             ->assertOk()
-            ->assertJsonPath('email', $user->email);
+            ->assertJsonPath('data.email', $user->email)
+            ->assertJsonPath('data.roles.0', RoleName::Owner->value)
+            ->assertJsonPath(
+                'data.permissions.0',
+                PermissionName::DashboardView->value,
+            );
     }
 
     public function test_authenticated_user_can_logout(): void
@@ -90,7 +118,7 @@ class AuthTest extends TestCase
             ]);
 
         $this->assertGuest('web');
-        
+
         Auth::forgetGuards();
 
         $this->fromSpa()
