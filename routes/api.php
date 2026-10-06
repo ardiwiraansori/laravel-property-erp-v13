@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\PermissionName;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\MasterData\PropertyDevelopmentController;
 use App\Http\Resources\AuthUserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -20,4 +22,20 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::prefix('master-data/property-developments')->group(function () {
+        Route::get('/', [
+            PropertyDevelopmentController::class,
+            'index',
+        ])->middleware(
+            'can:' . PermissionName::MasterDataPropertyDevelopmentsView->value,
+        );
+
+        Route::post('/', [
+            PropertyDevelopmentController::class,
+            'store',
+        ])->middleware(
+            'can:' . PermissionName::MasterDataPropertyDevelopmentsCreate->value,
+        );
+    });
 });

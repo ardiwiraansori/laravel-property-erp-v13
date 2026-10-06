@@ -1,13 +1,20 @@
 export const permissions = {
   dashboardView: 'dashboard.view',
+
   masterDataView: 'master-data.view',
+  propertyDevelopmentsView:
+    'master-data.property-developments.view',
+  propertyDevelopmentsCreate:
+    'master-data.property-developments.create',
+
   crmView: 'crm.view',
   salesView: 'sales.view',
   accountingView: 'accounting.view',
   reportsView: 'reports.view',
 } as const
 
-export type PermissionName = (typeof permissions)[keyof typeof permissions]
+export type PermissionName =
+  (typeof permissions)[keyof typeof permissions]
 
 export function hasPermission(
   userPermissions: readonly string[],

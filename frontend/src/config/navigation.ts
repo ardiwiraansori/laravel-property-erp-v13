@@ -29,7 +29,6 @@ export const navigationItems: NavigationItem[] = [
     href: '/master-data',
     icon: Building2,
     permission: permissions.masterDataView,
-    planned: true,
   },
   {
     title: 'CRM',

@@ -1,13 +1,18 @@
-import { Navigate, createBrowserRouter } from 'react-router'
+import {
+  Navigate,
+  Outlet,
+  createBrowserRouter,
+} from 'react-router'
 
 import { DashboardPage } from '@/components/dashboard/dashboard-page'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { ModulePlaceholderPage } from '@/components/module/module-placeholder-page'
 import { LoginPage } from '@/features/auth/login-page'
-import { ProtectedRoute } from '@/features/auth/protected-route'
-import { NotFoundPage } from '@/pages/not-found-page'
 import { PermissionRoute } from '@/features/auth/permission-route'
 import { permissions } from '@/features/auth/permissions'
+import { ProtectedRoute } from '@/features/auth/protected-route'
+import { PropertyDevelopmentsPage } from '@/features/master-data/property-developments/property-developments-page'
+import { NotFoundPage } from '@/pages/not-found-page'
 
 export const router = createBrowserRouter([
   {
@@ -27,7 +32,9 @@ export const router = createBrowserRouter([
           {
             path: 'dashboard',
             element: (
-              <PermissionRoute permission={permissions.dashboardView}>
+              <PermissionRoute
+                permission={permissions.dashboardView}
+              >
                 <DashboardPage />
               </PermissionRoute>
             ),
@@ -35,13 +42,35 @@ export const router = createBrowserRouter([
           {
             path: 'master-data',
             element: (
-              <PermissionRoute permission={permissions.masterDataView}>
-                <ModulePlaceholderPage
-                  title="Master Data"
-                  description="Manage the core reference data used across Property ERP."
-                />
+              <PermissionRoute
+                permission={permissions.masterDataView}
+              >
+                <Outlet />
               </PermissionRoute>
             ),
+            children: [
+              {
+                index: true,
+                element: (
+                  <Navigate
+                    to="property-developments"
+                    replace
+                  />
+                ),
+              },
+              {
+                path: 'property-developments',
+                element: (
+                  <PermissionRoute
+                    permission={
+                      permissions.propertyDevelopmentsView
+                    }
+                  >
+                    <PropertyDevelopmentsPage />
+                  </PermissionRoute>
+                ),
+              },
+            ],
           },
           {
             path: 'crm',
@@ -68,7 +97,9 @@ export const router = createBrowserRouter([
           {
             path: 'accounting',
             element: (
-              <PermissionRoute permission={permissions.accountingView}>
+              <PermissionRoute
+                permission={permissions.accountingView}
+              >
                 <ModulePlaceholderPage
                   title="Accounting"
                   description="Financial and accounting module foundation."
