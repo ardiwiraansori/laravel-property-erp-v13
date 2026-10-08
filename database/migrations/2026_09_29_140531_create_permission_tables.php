@@ -11,7 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $teams = config('permission.teams');
+        // Historical migration must replay its original non-team schema.
+        // Later migrations 000005 and 000007 introduce company scoping.
+        $teams = false;
         $tableNames = config('permission.table_names');
         $columnNames = config('permission.column_names');
         $pivotRole = $columnNames['role_pivot_key'] ?? 'role_id';

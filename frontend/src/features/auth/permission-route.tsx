@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { useAuth } from '@/features/auth/auth-state'
+import { useCompany } from '@/features/company/company-state'
 import { hasPermission, type PermissionName } from '@/features/auth/permissions'
 import { ForbiddenPage } from '@/pages/forbidden-page'
 
@@ -13,13 +13,13 @@ export function PermissionRoute({
   permission,
   children,
 }: PermissionRouteProps) {
-  const { user } = useAuth()
+  const { activeCompany } = useCompany()
 
-  if (!user) {
+  if (!activeCompany) {
     return null
   }
 
-  if (!hasPermission(user.permissions, permission)) {
+  if (!hasPermission(activeCompany.permissions, permission)) {
     return <ForbiddenPage />
   }
 

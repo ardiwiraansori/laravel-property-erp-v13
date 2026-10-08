@@ -52,20 +52,6 @@ class AuthTest extends TestCase
             'password' => 'password',
         ]);
 
-        $permission = Permission::findOrCreate(
-            PermissionName::DashboardView->value,
-            'web',
-        );
-
-        $role = Role::findOrCreate(
-            RoleName::Owner->value,
-            'web',
-        );
-
-        $role->givePermissionTo($permission);
-
-        $user->assignRole($role);
-
         $loginResponse = $this->fromSpa()->postJson('/api/login', [
             'email' => 'ardi@example.com',
             'password' => 'password',
@@ -75,11 +61,8 @@ class AuthTest extends TestCase
             ->assertOk()
             ->assertJsonPath('message', 'Login successful.')
             ->assertJsonPath('user.email', $user->email)
-            ->assertJsonPath('user.roles.0', RoleName::Owner->value)
-            ->assertJsonPath(
-                'user.permissions.0',
-                PermissionName::DashboardView->value,
-            );
+            ->assertJsonPath('user.roles', [])
+            ->assertJsonPath('user.permissions', []);
 
         $this->assertAuthenticatedAs($user);
 
@@ -88,11 +71,8 @@ class AuthTest extends TestCase
         $userResponse
             ->assertOk()
             ->assertJsonPath('data.email', $user->email)
-            ->assertJsonPath('data.roles.0', RoleName::Owner->value)
-            ->assertJsonPath(
-                'data.permissions.0',
-                PermissionName::DashboardView->value,
-            );
+            ->assertJsonPath('data.roles', [])
+            ->assertJsonPath('data.permissions', []);
     }
 
     public function test_authenticated_user_can_logout(): void

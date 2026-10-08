@@ -3,6 +3,7 @@
 namespace App\Http\Requests\MasterData;
 
 use App\Models\PropertyDevelopment;
+use App\Support\Tenancy\CurrentCompanyContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -20,30 +21,22 @@ class StorePropertyDevelopmentRequest extends FormRequest
         $name = $this->input('name');
 
         $this->merge([
-            'code' => is_string($code)
-                ? Str::upper(trim($code))
-                : $code,
-            'name' => is_string($name)
-                ? trim($name)
-                : $name,
+            'code' => is_string($code) ? Str::upper(trim($code)) : $code,
+            'name' => is_string($name) ? trim($name) : $name,
         ]);
     }
 
     public function rules(): array
     {
+        $companyId = app(CurrentCompanyContext::class)->id();
+
         return [
             'code' => [
-                'required',
-                'string',
-                'max:20',
-                'alpha_dash:ascii',
-                Rule::unique(PropertyDevelopment::class, 'code'),
+                'required', 'string', 'max:20', 'alpha_dash:ascii',
+                Rule::unique(PropertyDevelopment::class, 'code')
+                    ->where('company_id', $companyId),
             ],
-            'name' => [
-                'required',
-                'string',
-                'max:150',
-            ],
+            'name' => ['required', 'string', 'max:150'],
         ];
     }
 }

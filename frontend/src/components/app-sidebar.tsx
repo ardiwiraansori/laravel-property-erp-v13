@@ -14,20 +14,20 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { navigationItems } from '@/config/navigation'
-import { useAuth } from '@/features/auth/auth-state'
+import { useCompany } from '@/features/company/company-state'
 import { hasPermission } from '@/features/auth/permissions'
 
 export function AppSidebar() {
   const location = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
-  const { user } = useAuth()
+  const { activeCompany } = useCompany()
 
-  if (!user) {
+  if (!activeCompany) {
     return null
   }
 
   const accessibleNavigationItems = navigationItems.filter((item) =>
-    hasPermission(user.permissions, item.permission),
+    hasPermission(activeCompany.permissions, item.permission),
   )
 
   function handleNavigation() {

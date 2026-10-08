@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/app-sidebar'
 import { ApiHealthStatus } from '@/components/dashboard/api-health-status'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { TopbarUserMenu } from '@/components/layout/topbar-user-menu'
+import { CompanySwitcher } from '@/components/layout/company-switcher'
 import { Separator } from '@/components/ui/separator'
 import {
   SidebarInset,
@@ -44,6 +45,7 @@ export function DashboardLayout() {
               <ApiHealthStatus />
             </div>
 
+            <CompanySwitcher />
             <ThemeToggle />
 
             <TopbarUserMenu

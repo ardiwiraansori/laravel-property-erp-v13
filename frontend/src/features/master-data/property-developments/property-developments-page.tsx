@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAuth } from '@/features/auth/auth-state'
+import { useCompany } from '@/features/company/company-state'
 import {
   hasPermission,
   permissions,
@@ -38,7 +38,7 @@ type FieldErrors = {
 }
 
 export function PropertyDevelopmentsPage() {
-  const { user } = useAuth()
+  const { activeCompany } = useCompany()
 
   const [developments, setDevelopments] = useState<
     PropertyDevelopment[]
@@ -54,9 +54,9 @@ export function PropertyDevelopmentsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const canCreate =
-    user !== null &&
+    activeCompany !== null &&
     hasPermission(
-      user.permissions,
+      activeCompany.permissions,
       permissions.propertyDevelopmentsCreate,
     )
 

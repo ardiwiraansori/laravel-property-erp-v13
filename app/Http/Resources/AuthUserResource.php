@@ -22,15 +22,10 @@ class AuthUserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
-            'roles' => $this->getRoleNames()
-                ->sort()
-                ->values()
-                ->all(),
-            'permissions' => $this->getAllPermissions()
-                ->pluck('name')
-                ->sort()
-                ->values()
-                ->all(),
+            // Authentication identity is global; tenant permissions are not.
+            // They will be included by a tenant-scoped response in a later batch.
+            'roles' => [],
+            'permissions' => [],
         ];
     }
 }
