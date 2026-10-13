@@ -26,6 +26,16 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('diagnostics-report', static function (Request $request): array {
+            $userId = (string) ($request->user()?->getAuthIdentifier() ?? 'guest');
+            // ResolveCompany has already verified this tenant header and membership.
+            $companyId = (string) $request->header('X-Company-ID', 'missing');
+            return [
+                Limit::perMinutes(10, 5)->by('diagnostics:user:'.$userId.':company:'.$companyId),
+                Limit::perMinute(30)->by('diagnostics:ip:'.hash('sha256', (string) $request->ip())),
+            ];
+        });
+
         RateLimiter::for('platform-mfa-attempt', static function (Request $request): array {
             $identity = (string) ($request->user()?->getAuthIdentifier() ?? 'guest');
             $ip = (string) $request->ip();

@@ -8,16 +8,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
-/**
- * Allowlisted, append-only access records. Never store search strings, email,
- * request bodies, responses, cookies or credentials in audit metadata.
- */
+/** Append-only access audit: no response bodies, search text, or credentials. */
 final class PlatformDirectoryAudit
 {
     private const ACTIONS = [
         'platform.companies.read',
         'platform.users.read',
         'platform.user_memberships.read',
+        'platform.diagnostics.read',
     ];
 
     public function record(Request $request, string $action, ?User $subject = null): string
@@ -26,9 +24,7 @@ final class PlatformDirectoryAudit
             throw new InvalidArgumentException('Unsupported platform audit action.');
         }
 
-        // The platform.admin middleware has already authenticated and authorized this actor.
         $requestId = (string) Str::ulid();
-
         DB::table('platform_audit_logs')->insert([
             'event_id' => (string) Str::ulid(),
             'request_id' => $requestId,
@@ -42,7 +38,6 @@ final class PlatformDirectoryAudit
             'metadata' => null,
             'created_at' => now(),
         ]);
-
         return $requestId;
     }
 }

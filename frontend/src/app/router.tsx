@@ -14,6 +14,8 @@ import { PermissionRoute } from '@/features/auth/permission-route'
 import { permissions } from '@/features/auth/permissions'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { CompanyProvider } from '@/features/company/company-context'
+import { ReportProblemPage } from '@/features/diagnostics/report-problem-page'
+import { PlatformDiagnosticsPage } from '@/features/platform/platform-diagnostics-page'
 import { PropertyDevelopmentsPage } from '@/features/master-data/property-developments/property-developments-page'
 import { PlatformCompaniesPage } from '@/features/platform/platform-companies-page'
 import { PlatformMfaPage } from '@/features/platform/platform-mfa-page'
@@ -35,6 +37,7 @@ export const router = createBrowserRouter([
       children: [
         { index: true, element: <PlatformOverviewPage /> },
         { path: 'companies', element: <PlatformCompaniesPage /> },
+        { path: 'diagnostics', element: <PlatformDiagnosticsPage /> },
         { path: 'users', element: <PlatformUsersPage /> },
         { path: '*', element: <NotFoundPage /> },
       ],
@@ -46,6 +49,7 @@ export const router = createBrowserRouter([
       {
         element: <DashboardLayout />,
         children: [
+          { path: 'report-problem', element: <ReportProblemPage /> },
           {
             path: 'dashboard',
             element: <PermissionRoute permission={permissions.dashboardView}>

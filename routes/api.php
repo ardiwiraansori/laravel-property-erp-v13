@@ -3,10 +3,12 @@
 use App\Enums\PermissionName;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyContextController;
+use App\Http\Controllers\Api\Diagnostics\DiagnosticReportController;
 use App\Http\Controllers\Api\MasterData\PropertyDevelopmentController;
 use App\Http\Controllers\Api\Platform\PlatformCapabilityController;
 use App\Http\Controllers\Api\Platform\PlatformCompanyController;
 use App\Http\Controllers\Api\Platform\PlatformCompanyManagementController;
+use App\Http\Controllers\Api\Platform\PlatformDiagnosticController;
 use App\Http\Controllers\Api\Platform\PlatformIdentityController;
 use App\Http\Controllers\Api\Platform\PlatformMfaController;
 use App\Http\Controllers\Api\Platform\PlatformUserController;
@@ -53,6 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('/me', [PlatformIdentityController::class, 'show']);
                 Route::get('/capabilities', [PlatformCapabilityController::class, 'show']);
                 Route::get('/companies', [PlatformCompanyController::class, 'index']);
+                Route::get('/diagnostics/reports', [PlatformDiagnosticController::class, 'index']);
                 Route::get('/users', [PlatformUserController::class, 'index']);
                 Route::get('/users/{user}/memberships', [PlatformUserController::class, 'memberships'])
                     ->whereNumber('user');
@@ -68,6 +71,13 @@ Route::middleware('auth:sanctum')->group(function () {
                 });
             });
         });
+
+    // Tenant-scoped incident intake. POST is rate-limited per reporter and company.
+    Route::prefix('diagnostics/reports')->middleware('company')->group(function () {
+        Route::get('/', [DiagnosticReportController::class, 'index']);
+        Route::post('/', [DiagnosticReportController::class, 'store'])
+            ->middleware('throttle:diagnostics-report');
+    });
 
     Route::prefix('master-data/property-developments')
         ->middleware('company')
