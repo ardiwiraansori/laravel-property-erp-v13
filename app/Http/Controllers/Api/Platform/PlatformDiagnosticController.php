@@ -24,14 +24,14 @@ final class PlatformDiagnosticController extends Controller
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'company_id' => ['sometimes', 'integer', 'min:1', 'exists:companies,id'],
             'category' => ['sometimes', Rule::in(DiagnosticFields::CATEGORIES)],
-            'status' => ['sometimes', Rule::in(['new', 'triaged', 'resolved', 'closed'])],
+            'status' => ['sometimes', Rule::in(['new', 'triaged', 'in_progress', 'resolved', 'closed'])],
         ]);
 
         $query = DiagnosticReport::query()
             ->select([
                 'id', 'public_id', 'company_id', 'reporter_user_id', 'category',
                 'module', 'impact', 'error_kind', 'browser_family', 'viewport',
-                'status', 'created_at',
+                'status', 'assigned_platform_admin_user_id', 'workflow_version', 'created_at',
             ])->with('company:id,code');
         if (isset($params['company_id'])) {
             $query->where('company_id', (int) $params['company_id']);
@@ -58,6 +58,8 @@ final class PlatformDiagnosticController extends Controller
                 'browser_family' => $report->browser_family,
                 'viewport' => $report->viewport,
                 'status' => $report->status,
+                'assigned_platform_admin_user_id' => $report->assigned_platform_admin_user_id,
+                'workflow_version' => (int) $report->workflow_version,
                 'created_at' => $report->created_at?->toIso8601String(),
             ])->values(),
             'meta' => [

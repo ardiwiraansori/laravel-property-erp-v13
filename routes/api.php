@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Platform\PlatformCapabilityController;
 use App\Http\Controllers\Api\Platform\PlatformCompanyController;
 use App\Http\Controllers\Api\Platform\PlatformCompanyManagementController;
 use App\Http\Controllers\Api\Platform\PlatformDiagnosticController;
+use App\Http\Controllers\Api\Platform\PlatformDiagnosticWorkflowController;
 use App\Http\Controllers\Api\Platform\PlatformIdentityController;
 use App\Http\Controllers\Api\Platform\PlatformMfaController;
 use App\Http\Controllers\Api\Platform\PlatformUserController;
@@ -56,11 +57,18 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('/capabilities', [PlatformCapabilityController::class, 'show']);
                 Route::get('/companies', [PlatformCompanyController::class, 'index']);
                 Route::get('/diagnostics/reports', [PlatformDiagnosticController::class, 'index']);
+                Route::get('/diagnostics/assignees', [PlatformDiagnosticWorkflowController::class, 'assignees']);
+                Route::get('/diagnostics/reports/{publicId}', [PlatformDiagnosticWorkflowController::class, 'show'])
+                    ->where('publicId', '[0-9A-HJKMNP-TV-Z]{26}');
                 Route::get('/users', [PlatformUserController::class, 'index']);
                 Route::get('/users/{user}/memberships', [PlatformUserController::class, 'memberships'])
                     ->whereNumber('user');
 
                 Route::middleware('platform.write')->group(function () {
+                    Route::patch('/diagnostics/reports/{publicId}/status', [PlatformDiagnosticWorkflowController::class, 'status'])
+                        ->where('publicId', '[0-9A-HJKMNP-TV-Z]{26}')->middleware('throttle:platform-diagnostics-update');
+                    Route::patch('/diagnostics/reports/{publicId}/assignment', [PlatformDiagnosticWorkflowController::class, 'assignment'])
+                        ->where('publicId', '[0-9A-HJKMNP-TV-Z]{26}')->middleware('throttle:platform-diagnostics-update');
                     Route::post('/companies', [PlatformCompanyManagementController::class, 'store']);
                     Route::patch('/companies/{company}', [PlatformCompanyManagementController::class, 'update'])->whereNumber('company');
                     Route::patch('/users/{user}', [PlatformUserManagementController::class, 'update'])->whereNumber('user');

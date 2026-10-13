@@ -36,6 +36,14 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('platform-diagnostics-update', static function (Request $request): array {
+            $userId = (string) ($request->user()?->getAuthIdentifier() ?? 'guest');
+            return [
+                Limit::perMinute(20)->by('platform-diagnostics-actor:'.$userId),
+                Limit::perMinute(60)->by('platform-diagnostics-ip:'.hash('sha256', (string) $request->ip())),
+            ];
+        });
+
         RateLimiter::for('platform-mfa-attempt', static function (Request $request): array {
             $identity = (string) ($request->user()?->getAuthIdentifier() ?? 'guest');
             $ip = (string) $request->ip();

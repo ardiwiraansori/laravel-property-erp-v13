@@ -203,7 +203,8 @@ final class DiagnosticReportTest extends TestCase
             ->assertDontSee($reporter->email);
         $this->assertSame([
             'public_id', 'company_id', 'company_code', 'reporter_user_id', 'category',
-            'module', 'impact', 'error_kind', 'browser_family', 'viewport', 'status', 'created_at',
+            'module', 'impact', 'error_kind', 'browser_family', 'viewport', 'status',
+            'assigned_platform_admin_user_id', 'workflow_version', 'created_at',
         ], array_keys($this->getJson('/api/platform/diagnostics/reports')->json('data.0')));
         $this->assertDatabaseHas('platform_audit_logs', [
             'action' => 'platform.diagnostics.read', 'actor_user_id' => $admin->id,

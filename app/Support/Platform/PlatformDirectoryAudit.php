@@ -16,6 +16,8 @@ final class PlatformDirectoryAudit
         'platform.users.read',
         'platform.user_memberships.read',
         'platform.diagnostics.read',
+        'platform.diagnostics.detail.read',
+        'platform.diagnostics.assignees.read',
     ];
 
     public function record(Request $request, string $action, ?User $subject = null): string
