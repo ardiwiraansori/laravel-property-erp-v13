@@ -9,10 +9,11 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
+use Tests\Concerns\WithVerifiedPlatformMfa;
 
 final class PlatformManagementTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, WithVerifiedPlatformMfa;
 
     private function admin(): User
     {
@@ -22,6 +23,7 @@ final class PlatformManagementTest extends TestCase
             'granted_at' => now(),
             'is_active' => true,
         ]);
+        $this->withVerifiedPlatformMfa($user);
         return $user;
     }
 
@@ -48,10 +50,10 @@ final class PlatformManagementTest extends TestCase
     {
         config()->set('platform.mutations_enabled', true);
         $this->actingAs($this->admin());
-        $this->getJson('/api/platform/capabilities')
-            ->assertOk()->assertJsonPath('data.writes_enabled', false);
+        $this->withSession(['platform_mfa_verified' => false]);
+        $this->getJson('/api/platform/capabilities')->assertStatus(428);
         $this->postJson('/api/platform/companies', ['code' => 'NEW-01', 'name' => 'New company'])
-            ->assertStatus(423);
+            ->assertStatus(428);
         $this->assertDatabaseCount('companies', 0);
     }
 

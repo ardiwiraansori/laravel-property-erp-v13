@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Platform\PlatformCapabilityController;
 use App\Http\Controllers\Api\Platform\PlatformCompanyController;
 use App\Http\Controllers\Api\Platform\PlatformCompanyManagementController;
 use App\Http\Controllers\Api\Platform\PlatformIdentityController;
+use App\Http\Controllers\Api\Platform\PlatformMfaController;
 use App\Http\Controllers\Api\Platform\PlatformUserController;
 use App\Http\Controllers\Api\Platform\PlatformUserManagementController;
 use App\Http\Resources\AuthUserResource;
@@ -38,25 +39,33 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('platform')
         ->middleware('platform.admin')
         ->group(function () {
-            Route::get('/me', [PlatformIdentityController::class, 'show']);
-            Route::get('/capabilities', [PlatformCapabilityController::class, 'show']);
-            Route::get('/companies', [PlatformCompanyController::class, 'index']);
-            Route::get('/users', [PlatformUserController::class, 'index']);
-            Route::get('/users/{user}/memberships', [PlatformUserController::class, 'memberships'])
-                ->whereNumber('user');
+            Route::prefix('mfa')->middleware('platform.session')->group(function () {
+                Route::get('/status', [PlatformMfaController::class, 'status']);
+                Route::middleware('throttle:platform-mfa-attempt')->group(function () {
+                Route::post('/setup', [PlatformMfaController::class, 'setup']);
+                Route::post('/confirm', [PlatformMfaController::class, 'confirm']);
+                Route::post('/challenge', [PlatformMfaController::class, 'challenge']);
+                Route::post('/recover', [PlatformMfaController::class, 'recover']);
+                });
+            });
 
-            // Write paths are intentionally locked until a separately reviewed
-            // server-issued platform MFA verification has been implemented.
-            Route::middleware('platform.write')->group(function () {
-                Route::post('/companies', [PlatformCompanyManagementController::class, 'store']);
-                Route::patch('/companies/{company}', [PlatformCompanyManagementController::class, 'update'])
-                    ->whereNumber('company');
-                Route::patch('/users/{user}', [PlatformUserManagementController::class, 'update'])
+            Route::middleware('platform.mfa')->group(function () {
+                Route::get('/me', [PlatformIdentityController::class, 'show']);
+                Route::get('/capabilities', [PlatformCapabilityController::class, 'show']);
+                Route::get('/companies', [PlatformCompanyController::class, 'index']);
+                Route::get('/users', [PlatformUserController::class, 'index']);
+                Route::get('/users/{user}/memberships', [PlatformUserController::class, 'memberships'])
                     ->whereNumber('user');
-                Route::post('/users/{user}/memberships/{company}', [PlatformUserManagementController::class, 'attach'])
-                    ->whereNumber('user')->whereNumber('company');
-                Route::delete('/users/{user}/memberships/{company}', [PlatformUserManagementController::class, 'detach'])
-                    ->whereNumber('user')->whereNumber('company');
+
+                Route::middleware('platform.write')->group(function () {
+                    Route::post('/companies', [PlatformCompanyManagementController::class, 'store']);
+                    Route::patch('/companies/{company}', [PlatformCompanyManagementController::class, 'update'])->whereNumber('company');
+                    Route::patch('/users/{user}', [PlatformUserManagementController::class, 'update'])->whereNumber('user');
+                    Route::post('/users/{user}/memberships/{company}', [PlatformUserManagementController::class, 'attach'])
+                        ->whereNumber('user')->whereNumber('company');
+                    Route::delete('/users/{user}/memberships/{company}', [PlatformUserManagementController::class, 'detach'])
+                        ->whereNumber('user')->whereNumber('company');
+                });
             });
         });
 

@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsurePlatformWriteEnabled;
+use App\Http\Middleware\EnsurePlatformMfa;
+use App\Http\Middleware\EnsurePlatformBrowserSession;
 use App\Http\Middleware\ResolveCompany;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -21,6 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'company' => ResolveCompany::class,
             'platform.admin' => EnsurePlatformAdmin::class,
             'platform.write' => EnsurePlatformWriteEnabled::class,
+            'platform.mfa' => EnsurePlatformMfa::class,
+            'platform.session' => EnsurePlatformBrowserSession::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -25,5 +25,14 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(40)->by('erp-login-ip:'.hash('sha256', $ip)),
             ];
         });
+
+        RateLimiter::for('platform-mfa-attempt', static function (Request $request): array {
+            $identity = (string) ($request->user()?->getAuthIdentifier() ?? 'guest');
+            $ip = (string) $request->ip();
+            return [
+                Limit::perMinute(6)->by('platform-mfa-user:'.$identity),
+                Limit::perMinute(30)->by('platform-mfa-ip:'.hash('sha256', $ip)),
+            ];
+        });
     }
 }

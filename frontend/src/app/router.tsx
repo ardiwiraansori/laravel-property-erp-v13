@@ -16,6 +16,7 @@ import { ProtectedRoute } from '@/features/auth/protected-route'
 import { CompanyProvider } from '@/features/company/company-context'
 import { PropertyDevelopmentsPage } from '@/features/master-data/property-developments/property-developments-page'
 import { PlatformCompaniesPage } from '@/features/platform/platform-companies-page'
+import { PlatformMfaPage } from '@/features/platform/platform-mfa-page'
 import { PlatformOverviewPage } from '@/features/platform/platform-overview-page'
 import { PlatformRoute } from '@/features/platform/platform-route'
 import { PlatformUsersPage } from '@/features/platform/platform-users-page'
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/entry" replace /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/entry', element: <AccountEntryRoute /> },
+  { path: '/platform/mfa', element: <PlatformMfaPage /> },
   {
     path: '/platform',
     element: <PlatformRoute />,

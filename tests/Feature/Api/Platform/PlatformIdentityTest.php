@@ -7,10 +7,11 @@ use App\Models\PlatformAdmin;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use Tests\Concerns\WithVerifiedPlatformMfa;
 
 final class PlatformIdentityTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, WithVerifiedPlatformMfa;
 
     private function createCompany(string $code = 'TENANT-A', bool $active = true): Company
     {
@@ -23,11 +24,13 @@ final class PlatformIdentityTest extends TestCase
 
     private function grantPlatformAccess(User $user, bool $active = true): PlatformAdmin
     {
-        return PlatformAdmin::query()->create([
+        $admin = PlatformAdmin::query()->create([
             'user_id' => $user->id,
             'is_active' => $active,
             'granted_at' => now(),
         ]);
+        $this->withVerifiedPlatformMfa($user);
+        return $admin;
     }
 
     public function test_guest_cannot_access_platform_identity(): void

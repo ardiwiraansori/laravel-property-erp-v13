@@ -25,3 +25,16 @@ api.interceptors.request.use(config => {
   }
   return config
 })
+
+// A session may expire while the user is viewing a directory.
+// Never fall back to tenant permissions when a platform MFA proof expires.
+api.interceptors.response.use(response => response, error => {
+  if (axios.isAxiosError(error) && error.response?.status === 428) {
+    const path = (error.config?.url ?? '').split('?')[0]
+    if (path.startsWith('/api/platform/') && !path.startsWith('/api/platform/mfa/') &&
+      window.location.pathname.startsWith('/platform') && window.location.pathname !== '/platform/mfa') {
+      window.location.replace('/platform/mfa')
+    }
+  }
+  return Promise.reject(error)
+})

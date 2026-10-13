@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/auth-state'
 import { api } from '@/lib/api'
 
-type Result = 'loading' | 'platform' | 'tenant' | 'unauthenticated' | 'error'
+type Result = 'loading' | 'platform' | 'mfa' | 'tenant' | 'unauthenticated' | 'error'
 
 function safeReturnPath(value: unknown): string | null {
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') ||
@@ -33,7 +33,9 @@ export function AccountEntryRoute() {
       })
       .catch((error: unknown) => {
         if (!active) return
-        if (axios.isAxiosError(error) && error.response?.status === 403) {
+        if (axios.isAxiosError(error) && error.response?.status === 428) {
+          setResult('mfa')
+        } else if (axios.isAxiosError(error) && error.response?.status === 403) {
           setResult('tenant')
         } else if (axios.isAxiosError(error) && error.response?.status === 401) {
           setResult('unauthenticated')
@@ -49,6 +51,7 @@ export function AccountEntryRoute() {
     return <main className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Checking account access...</main>
   }
   if (!user || result === 'unauthenticated') return <Navigate to="/login" replace />
+  if (result === 'mfa') return <Navigate to="/platform/mfa" replace />
   if (result === 'platform') {
     return <Navigate to={from?.startsWith('/platform') ? from : '/platform'} replace />
   }

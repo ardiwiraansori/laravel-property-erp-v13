@@ -7,7 +7,7 @@ import { useAuth } from '@/features/auth/auth-state'
 import { api } from '@/lib/api'
 import { ForbiddenPage } from '@/pages/forbidden-page'
 
-type Access = 'loading' | 'allowed' | 'denied' | 'unauthenticated' | 'error'
+type Access = 'loading' | 'allowed' | 'mfa' | 'denied' | 'unauthenticated' | 'error'
 
 export function PlatformRoute() {
   const { user, checkingSession } = useAuth()
@@ -25,7 +25,9 @@ export function PlatformRoute() {
       })
       .catch((error: unknown) => {
         if (!active) return
-        if (axios.isAxiosError(error) && error.response?.status === 403) {
+        if (axios.isAxiosError(error) && error.response?.status === 428) {
+          setAccess('mfa')
+        } else if (axios.isAxiosError(error) && error.response?.status === 403) {
           setAccess('denied')
         } else if (axios.isAxiosError(error) && error.response?.status === 401) {
           setAccess('unauthenticated')
@@ -43,6 +45,7 @@ export function PlatformRoute() {
   if (!user || access === 'unauthenticated') {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
+  if (access === 'mfa') return <Navigate to="/platform/mfa" replace />
   if (access === 'denied') return <ForbiddenPage />
   if (access === 'error') {
     return <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-4 text-center">

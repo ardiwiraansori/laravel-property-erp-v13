@@ -8,10 +8,11 @@ use App\Models\PropertyDevelopment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use Tests\Concerns\WithVerifiedPlatformMfa;
 
 final class PlatformDirectoryTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, WithVerifiedPlatformMfa;
 
     private function admin(): User
     {
@@ -22,6 +23,7 @@ final class PlatformDirectoryTest extends TestCase
             'granted_at' => now(),
         ]);
 
+        $this->withVerifiedPlatformMfa($user);
         return $user;
     }
 
