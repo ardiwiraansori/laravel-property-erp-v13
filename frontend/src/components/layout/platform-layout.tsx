@@ -21,7 +21,7 @@ export function PlatformLayout() {
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">Property ERP</p>
-            <p className="hidden truncate text-xs text-muted-foreground sm:block">Platform Administration · Read-only</p>
+            <p className="hidden truncate text-xs text-muted-foreground sm:block">Platform Administration · Protected</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden lg:block"><ApiHealthStatus /></div>

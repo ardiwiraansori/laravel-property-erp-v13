@@ -4,6 +4,7 @@ import type { FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { PlatformCompanyManagement } from '@/features/platform/platform-company-management'
 import { DirectoryPager } from '@/features/platform/directory-pager'
 import { getPlatformCompanies } from '@/features/platform/platform-api'
 import type { Paginated, PlatformCompany } from '@/features/platform/platform-api'
@@ -54,11 +55,11 @@ export function PlatformCompaniesPage() {
           <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">No companies found.</p> :
           <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm">
             <thead><tr className="border-b text-muted-foreground">
-              <th className="pb-3 pr-4 font-medium">Code</th><th className="pb-3 pr-4 font-medium">Company</th>
+              <th className="pb-3 pr-4 font-medium">ID</th><th className="pb-3 pr-4 font-medium">Code</th><th className="pb-3 pr-4 font-medium">Company</th>
               <th className="pb-3 pr-4 font-medium">Status</th><th className="pb-3 text-right font-medium">Members</th>
             </tr></thead>
             <tbody>{response?.data.map(company => <tr key={company.id} className="border-b last:border-0">
-              <td className="py-3 pr-4 font-mono text-xs">{company.code}</td><td className="py-3 pr-4">{company.name}</td>
+              <td className="py-3 pr-4 tabular-nums">{company.id}</td><td className="py-3 pr-4 font-mono text-xs">{company.code}</td><td className="py-3 pr-4">{company.name}</td>
               <td className="py-3 pr-4">{company.is_active ? 'Active' : 'Inactive'}</td>
               <td className="py-3 text-right tabular-nums">{company.members_count}</td>
             </tr>)}</tbody>
@@ -67,5 +68,6 @@ export function PlatformCompaniesPage() {
           onPageChange={next => { setLoading(true); setPage(next) }} />}
       </CardContent>
     </Card>
+    <PlatformCompanyManagement />
   </div>
 }

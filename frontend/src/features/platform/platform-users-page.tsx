@@ -4,6 +4,7 @@ import type { FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { PlatformUserManagement } from '@/features/platform/platform-user-management'
 import { DirectoryPager } from '@/features/platform/directory-pager'
 import { getPlatformMemberships, getPlatformUsers } from '@/features/platform/platform-api'
 import type { Paginated, PlatformMembership, PlatformUser } from '@/features/platform/platform-api'
@@ -92,11 +93,11 @@ export function PlatformUsersPage() {
         </div> : loading ? <p className="text-sm text-muted-foreground">Loading users...</p> :
         response?.data.length === 0 ? <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">No users found.</p> :
         <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm">
-          <thead><tr className="border-b text-muted-foreground"><th className="pb-3 pr-4 font-medium">Name</th>
+          <thead><tr className="border-b text-muted-foreground"><th className="pb-3 pr-4 font-medium">ID</th><th className="pb-3 pr-4 font-medium">Name</th>
             <th className="pb-3 pr-4 font-medium">Email</th><th className="pb-3 pr-4 text-right font-medium">Memberships</th>
             <th className="pb-3 font-medium">Action</th></tr></thead>
           <tbody>{response?.data.map(user => <tr key={user.id} className="border-b last:border-0">
-            <td className="py-3 pr-4">{user.name}</td><td className="py-3 pr-4">{user.email}</td>
+            <td className="py-3 pr-4 tabular-nums">{user.id}</td><td className="py-3 pr-4">{user.name}</td><td className="py-3 pr-4">{user.email}</td>
             <td className="py-3 pr-4 text-right tabular-nums">{user.memberships_count}</td>
             <td className="py-3"><Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
               View memberships</Button></td>
@@ -107,5 +108,6 @@ export function PlatformUsersPage() {
       </CardContent>
     </Card>
     {selectedUser ? <MembershipPanel key={selectedUser.id} user={selectedUser} /> : null}
+    <PlatformUserManagement />
   </div>
 }

@@ -40,6 +40,6 @@ export function PlatformOverviewPage() {
         <CardContent><Link to="/platform/users" className="inline-flex items-center gap-2 text-sm underline underline-offset-4"><Users className="size-4" /> User directory</Link></CardContent>
       </Card>
     </div>
-    <p className="text-xs text-muted-foreground">This checkpoint is read-only. Account changes, permission repair and support workflows will be added in later checkpoints.</p>
+    <p className="text-xs text-muted-foreground">Management forms are staged and locked until platform MFA is implemented. Role repair and support workflows will follow a separate review.</p>
   </div>
 }
