@@ -1,5 +1,5 @@
 import { api } from '@/lib/api'
-import type { DiagnosticPage } from '@/features/diagnostics/diagnostic-api'
+import type { DiagnosticPage, DiagnosticModule, DiagnosticCategory, DiagnosticImpact } from '@/features/diagnostics/diagnostic-api'
 
 export type DiagnosticStatus = 'new' | 'triaged' | 'in_progress' | 'resolved' | 'closed'
 export const NEXT_STATUSES: Record<DiagnosticStatus, DiagnosticStatus[]> = {
@@ -48,6 +48,12 @@ export type WorkflowPerformanceSummary = {
   awaiting_first_triage: number
   average_hours_to_first_triage: number | null
   average_hours_to_first_resolution: number | null
+  case_mix: {
+    by_module: Record<DiagnosticModule, number>
+    by_category: Record<DiagnosticCategory, number>
+    by_impact: Record<DiagnosticImpact, number>
+  }
+  daily_reported: Array<{ date: string; count: number }>
 }
 export type PlatformReport = {
   public_id: string

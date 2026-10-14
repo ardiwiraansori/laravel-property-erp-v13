@@ -2,6 +2,7 @@
 
 namespace App\Support\Diagnostics;
 
+use App\Support\Diagnostics\DiagnosticFields;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ final class DiagnosticPerformance
      * The passed base scope is already restricted to company/category/impact.
      * Do not apply queue lane, status, pagination or assignment filters here.
      *
-     * @return array<string, int|float|null>
+     * @return array<string, mixed>
      */
     public function summarize(Builder $baseScope, CarbonInterface $asOf): array
     {
@@ -26,16 +27,42 @@ final class DiagnosticPerformance
         $triageSeconds = 0;
         $resolutionSeconds = 0;
 
+        // Fixed allowlist dimensions, never keys supplied by request parameters.
+        $byModule = array_fill_keys(DiagnosticFields::MODULES, 0);
+        $byCategory = array_fill_keys(DiagnosticFields::CATEGORIES, 0);
+        $byImpact = array_fill_keys(DiagnosticFields::IMPACTS, 0);
+        $dailyCounts = [];
+        $dailyStart = $asOf->copy()->startOfDay()->subDays(6);
+        for ($day = 0; $day < 7; $day++) {
+            $dailyCounts[$dailyStart->copy()->addDays($day)->toDateString()] = 0;
+        }
+
         (clone $baseScope)
             ->where('created_at', '>=', $asOf->copy()->subDays(self::WINDOW_DAYS))
             ->where('created_at', '<=', $asOf)
-            ->select(['id', 'created_at'])
+            ->select(['id', 'created_at', 'module', 'category', 'impact'])
             ->chunkById(200, function ($reports) use (
-                &$reported, &$triaged, &$resolved, &$reopened, &$triageSeconds, &$resolutionSeconds
+                &$reported, &$triaged, &$resolved, &$reopened, &$triageSeconds, &$resolutionSeconds,
+                &$byModule, &$byCategory, &$byImpact, &$dailyCounts, $dailyStart
             ): void {
                 $createdAt = [];
                 foreach ($reports as $report) {
                     $createdAt[(int) $report->id] = $report->created_at->getTimestamp();
+                    if (array_key_exists($report->module, $byModule)) {
+                        $byModule[$report->module]++;
+                    }
+                    if (array_key_exists($report->category, $byCategory)) {
+                        $byCategory[$report->category]++;
+                    }
+                    if (array_key_exists($report->impact, $byImpact)) {
+                        $byImpact[$report->impact]++;
+                    }
+                    if ($report->created_at->greaterThanOrEqualTo($dailyStart)) {
+                        $date = $report->created_at->toDateString();
+                        if (array_key_exists($date, $dailyCounts)) {
+                            $dailyCounts[$date]++;
+                        }
+                    }
                 }
                 $reported += count($createdAt);
                 $firstTriaged = [];
@@ -74,6 +101,11 @@ final class DiagnosticPerformance
                 $resolutionSeconds += array_sum($firstResolved);
             });
 
+        $dailyReported = [];
+        foreach ($dailyCounts as $date => $count) {
+            $dailyReported[] = ['date' => $date, 'count' => $count];
+        }
+
         return [
             'window_days' => self::WINDOW_DAYS,
             'reported' => $reported,
@@ -83,6 +115,12 @@ final class DiagnosticPerformance
             'awaiting_first_triage' => $reported - $triaged,
             'average_hours_to_first_triage' => $triaged > 0 ? round($triageSeconds / $triaged / 3600, 2) : null,
             'average_hours_to_first_resolution' => $resolved > 0 ? round($resolutionSeconds / $resolved / 3600, 2) : null,
+            'case_mix' => [
+                'by_module' => $byModule,
+                'by_category' => $byCategory,
+                'by_impact' => $byImpact,
+            ],
+            'daily_reported' => $dailyReported,
         ];
     }
 }

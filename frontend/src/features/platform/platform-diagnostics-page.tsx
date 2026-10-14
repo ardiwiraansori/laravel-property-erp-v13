@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DirectoryPager } from '@/features/platform/directory-pager'
 import { usePlatformWriteStatus } from '@/features/platform/use-platform-write-status'
 import { PlatformWriteNotice } from '@/features/platform/platform-write-status'
-import { categories, impacts } from '@/features/diagnostics/diagnostic-api'
+import { categories, impacts, modules } from '@/features/diagnostics/diagnostic-api'
 import {
   AGE_BUCKETS, DIAGNOSTIC_STATUSES, EMPTY_QUEUE_FILTERS, NEXT_STATUSES,
   changeDiagnosticAssignee, changeDiagnosticStatus,
@@ -139,6 +139,12 @@ export function PlatformDiagnosticsPage() {
 
   const options = detail ? NEXT_STATUSES[detail.data.status] : []
   const canWrite = write.enabled && !write.loading && !write.error && !saving
+  const largestDaily = Math.max(1, ...(results?.workflow_performance.daily_reported.map(item => item.count) ?? [0]))
+  const caseMixTables = results ? [
+    { heading: 'By module', rows: modules.map(([value, label]) => ({ value, label, count: results.workflow_performance.case_mix.by_module[value] })) },
+    { heading: 'By category', rows: categories.map(([value, label]) => ({ value, label, count: results.workflow_performance.case_mix.by_category[value] })) },
+    { heading: 'By impact', rows: impacts.map(([value, label]) => ({ value, label, count: results.workflow_performance.case_mix.by_impact[value] })) },
+  ] : []
 
   return <div className="space-y-5">
     <div><h1 className="text-2xl font-semibold tracking-tight">Diagnostic support workflow</h1>
@@ -252,6 +258,33 @@ export function PlatformDiagnosticsPage() {
                   ['Avg. hours to first resolution', averageHours(results.workflow_performance.average_hours_to_first_resolution)],
                 ] as Array<[string, string | number]>).map(([label, value]) => <div key={label} className="rounded-lg border p-3">
                   <p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-semibold tabular-nums">{value}</p>
+                </div>)}
+              </div>
+            </section>}
+            {results && <section aria-label="Diagnostic intake trends and case mix" className="space-y-4">
+              <div><h3 className="text-sm font-semibold">Diagnostic intake trends and case mix</h3>
+                <p className="text-xs text-muted-foreground">Daily submissions for the last 7 calendar dates (server timezone), and category/module/impact breakdown of the same 30-day rolling report cohort used above. Not an SLA.</p></div>
+              <div className="rounded-lg border p-3">
+                <h4 className="text-xs font-semibold">Reports received by day</h4>
+                <div className="mt-2 grid grid-cols-7 gap-1 sm:gap-3">
+                  {results.workflow_performance.daily_reported.map(item => <div key={item.date} className="min-w-0 text-center">
+                    <div className="flex h-24 items-end justify-center" title={`${item.date}: ${item.count} reports`}>
+                      <div aria-hidden="true" className="w-7 max-w-full rounded-t bg-primary" style={{ height: `${(item.count / largestDaily) * 100}%` }} />
+                    </div>
+                    <p className="mt-1 text-xs font-semibold tabular-nums">{item.count}</p>
+                    <p className="text-[10px] text-muted-foreground">{item.date.slice(5)}</p>
+                  </div>)}
+                </div>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-3">
+                {caseMixTables.map(({ heading, rows }) => <div key={heading} className="rounded-lg border p-3">
+                  <h4 className="mb-2 text-xs font-semibold">{heading}</h4>
+                  <div className="space-y-1">
+                    {rows.map(({ value, label, count }) => <div key={value} className="flex items-start justify-between gap-2 text-xs">
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className="font-semibold tabular-nums">{count}</span>
+                    </div>)}
+                  </div>
                 </div>)}
               </div>
             </section>}
