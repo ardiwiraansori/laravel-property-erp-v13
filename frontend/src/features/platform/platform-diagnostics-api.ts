@@ -9,6 +9,25 @@ export const NEXT_STATUSES: Record<DiagnosticStatus, DiagnosticStatus[]> = {
   resolved: ['closed', 'in_progress'],
   closed: ['triaged'],
 }
+export const DIAGNOSTIC_STATUSES: DiagnosticStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'closed']
+export type AssignmentScope = 'all' | 'mine' | 'assigned' | 'unassigned'
+export type SupportQueueFilters = {
+  companyId: string
+  status: string
+  category: string
+  impact: string
+  assignment: AssignmentScope
+}
+export const EMPTY_QUEUE_FILTERS: SupportQueueFilters = {
+  companyId: '', status: '', category: '', impact: '', assignment: 'all',
+}
+export type SupportQueueSummary = {
+  total: number
+  by_status: Record<DiagnosticStatus, number>
+  assigned: number
+  unassigned: number
+  mine: number
+}
 export type PlatformReport = {
   public_id: string
   company_id: number
@@ -25,6 +44,7 @@ export type PlatformReport = {
   workflow_version: number
   created_at: string | null
 }
+export type PlatformReportPage = DiagnosticPage<PlatformReport> & { summary: SupportQueueSummary }
 export type WorkflowHistory = {
   action: 'status_changed' | 'assignment_changed'
   actor_user_id: number
@@ -41,12 +61,15 @@ export type ReportDetail = {
 }
 export type Assignee = { id: number; name: string }
 
-export async function getPlatformReports(page: number, companyId: string, status: string) {
-  const response = await api.get<DiagnosticPage<PlatformReport>>('/api/platform/diagnostics/reports', {
+export async function getPlatformReports(page: number, filters: SupportQueueFilters) {
+  const response = await api.get<PlatformReportPage>('/api/platform/diagnostics/reports', {
     params: {
       page, per_page: 20,
-      ...(companyId ? { company_id: Number(companyId) } : {}),
-      ...(status ? { status } : {}),
+      ...(filters.companyId ? { company_id: Number(filters.companyId) } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.category ? { category: filters.category } : {}),
+      ...(filters.impact ? { impact: filters.impact } : {}),
+      ...(filters.assignment !== 'all' ? { assignment: filters.assignment } : {}),
     },
   })
   return response.data
