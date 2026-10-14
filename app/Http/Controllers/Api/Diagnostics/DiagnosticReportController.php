@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Diagnostics;
 use App\Http\Controllers\Controller;
 use App\Models\DiagnosticReport;
 use App\Support\Diagnostics\DiagnosticFields;
+use App\Support\Diagnostics\DiagnosticWorkflow;
 use App\Support\Tenancy\CurrentCompanyContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -72,6 +73,54 @@ final class DiagnosticReportController extends Controller
                 'last_page' => $page->lastPage(),
                 'per_page' => $page->perPage(),
                 'total' => $page->total(),
+            ],
+        ]);
+    }
+
+    /** Reporter-only, status-only history. Internal platform events never leave this endpoint. */
+    public function show(Request $request, CurrentCompanyContext $context, string $publicId): JsonResponse
+    {
+        $params = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
+        // Resolve access BEFORE reading events. Cross-company and cross-reporter
+        // IDs must return the same 404 as a non-existent report.
+        $report = DiagnosticReport::query()
+            ->where('public_id', $publicId)
+            ->where('company_id', $context->id())
+            ->where('reporter_user_id', (int) $request->user()->getAuthIdentifier())
+            ->firstOrFail();
+
+        $history = DB::table('diagnostic_report_events')
+            ->where('diagnostic_report_id', $report->id)
+            ->where('company_id', $context->id())
+            ->where('action', 'status_changed')
+            ->whereIn('from_status', DiagnosticWorkflow::STATUSES)
+            ->whereIn('to_status', DiagnosticWorkflow::STATUSES)
+            ->orderByDesc('id')
+            ->paginate(20, ['from_status', 'to_status', 'created_at'], 'page', (int) ($params['page'] ?? 1));
+
+        return response()->json([
+            'data' => [
+                'public_id' => $report->public_id,
+                'category' => $report->category,
+                'module' => $report->module,
+                'impact' => $report->impact,
+                'status' => $report->status,
+                'created_at' => $report->created_at?->toIso8601String(),
+                'updated_at' => ($report->updated_at ?? $report->created_at)?->toIso8601String(),
+            ],
+            'history' => $history->getCollection()->map(static fn ($event): array => [
+                'from_status' => $event->from_status,
+                'to_status' => $event->to_status,
+                'created_at' => $event->created_at,
+            ])->values(),
+            'meta' => [
+                'current_page' => $history->currentPage(),
+                'last_page' => $history->lastPage(),
+                'per_page' => $history->perPage(),
+                'total' => $history->total(),
             ],
         ]);
     }

@@ -6,18 +6,27 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCompany } from '@/features/company/company-state'
 import {
-  browserFamily, categories, errors, getMyDiagnosticReports, impacts, modules,
+  browserFamily, categories, errors, getMyDiagnosticProgress, getMyDiagnosticReports, impacts, modules,
   submitDiagnosticReport, viewportClass,
 } from '@/features/diagnostics/diagnostic-api'
 import type {
   DiagnosticCategory, DiagnosticErrorKind, DiagnosticImpact, DiagnosticModule,
-  DiagnosticPage, DiagnosticReport, ReportReceipt,
+  DiagnosticPage, DiagnosticReport, ReportReceipt, TenantDiagnosticProgress,
 } from '@/features/diagnostics/diagnostic-api'
 
 const selectClass = 'h-9 w-full rounded-lg border border-input bg-background px-3 text-sm'
 
+function statusLabel(value: string): string {
+  return value.replaceAll('_', ' ')
+}
+
+function displayDate(value: string | null): string {
+  return value ? new Date(value).toLocaleString('id-ID') : '—'
+}
+
 export function ReportProblemPage() {
   const { activeCompany } = useCompany()
+  const companyKey = String(activeCompany?.id ?? '')
   const [category, setCategory] = useState<DiagnosticCategory>('page_error')
   const [module, setModule] = useState<DiagnosticModule>('dashboard')
   const [impact, setImpact] = useState<DiagnosticImpact>('partial')
@@ -28,18 +37,51 @@ export function ReportProblemPage() {
   const [page, setPage] = useState(1)
   const [revision, setRevision] = useState(0)
   const [listing, setListing] = useState<DiagnosticPage<DiagnosticReport> | null>(null)
+  const [listingCompany, setListingCompany] = useState('')
   const [listError, setListError] = useState(false)
   const [listLoading, setListLoading] = useState(true)
+  const [selection, setSelection] = useState<{ publicId: string; company: string } | null>(null)
+  const [progress, setProgress] = useState<TenantDiagnosticProgress | null>(null)
+  const [progressPage, setProgressPage] = useState(1)
+  const [progressLoading, setProgressLoading] = useState(false)
+  const [progressError, setProgressError] = useState(false)
+  const [progressRevision, setProgressRevision] = useState(0)
 
   const refresh = useCallback(() => setRevision(value => value + 1), [])
+  const selectedId = selection?.company === companyKey ? selection.publicId : null
+  const visibleListing = listingCompany === companyKey ? listing : null
+  const visibleListLoading = listLoading || listingCompany !== companyKey
 
   useEffect(() => {
     let active = true
     void getMyDiagnosticReports(page).then(data => {
-      if (active) { setListing(data); setListError(false); setListLoading(false) }
-    }).catch(() => { if (active) { setListError(true); setListLoading(false) } })
+      if (active) { setListing(data); setListingCompany(companyKey); setListError(false); setListLoading(false) }
+    }).catch(() => { if (active) { setListingCompany(companyKey); setListError(true); setListLoading(false) } })
     return () => { active = false }
-  }, [page, revision, activeCompany?.id])
+  }, [page, revision, companyKey])
+
+  useEffect(() => {
+    if (!selectedId) return
+    let active = true
+    void getMyDiagnosticProgress(selectedId, progressPage).then(data => {
+      if (active) { setProgress(data); setProgressError(false); setProgressLoading(false) }
+    }).catch(() => { if (active) { setProgressError(true); setProgressLoading(false) } })
+    return () => { active = false }
+  }, [selectedId, progressPage, progressRevision])
+
+  function inspect(publicId: string) {
+    if (selectedId === publicId) {
+      setSelection(null)
+      setProgress(null)
+      return
+    }
+    setSelection({ publicId, company: companyKey })
+    setProgress(null)
+    setProgressPage(1)
+    setProgressError(false)
+    setProgressLoading(true)
+    setProgressRevision(value => value + 1)
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -106,25 +148,55 @@ export function ReportProblemPage() {
       </CardContent>
     </Card>
     <Card>
-      <CardHeader><CardTitle>Laporan saya</CardTitle><CardDescription>Hanya laporan Anda di perusahaan yang sedang aktif.</CardDescription></CardHeader>
+      <CardHeader><CardTitle>Laporan saya</CardTitle><CardDescription>Hanya laporan Anda di perusahaan yang sedang aktif. Klik Lihat progres untuk melihat perubahan status.</CardDescription></CardHeader>
       <CardContent className="space-y-3">
-        {listLoading && !listing ? <p className="text-sm text-muted-foreground">Memuat laporan...</p> :
+        {visibleListLoading && !visibleListing ? <p role="status" className="text-sm text-muted-foreground">Memuat laporan...</p> :
           listError ? <p role="alert" className="text-sm text-destructive">Gagal memuat daftar. <Button variant="outline" size="sm" onClick={() => { setListLoading(true); refresh() }}>Coba lagi</Button></p> :
-          listing?.data.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada laporan.</p> :
-          <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm">
-            <thead><tr className="border-b"><th className="py-2">ID Laporan</th><th>Kategori</th><th>Modul</th><th>Status</th></tr></thead>
-            <tbody>{listing?.data.map(item => <tr className="border-b last:border-0" key={item.public_id}>
-              <td className="py-2 font-mono text-xs">{item.public_id}</td><td>{item.category}</td><td>{item.module}</td><td>{item.status}</td>
+          visibleListing?.data.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada laporan.</p> :
+          <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm">
+            <thead><tr className="border-b"><th className="py-2">ID Laporan</th><th>Kategori</th><th>Modul</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody>{visibleListing?.data.map(item => <tr className="border-b last:border-0" key={item.public_id}>
+              <td className="py-2 font-mono text-xs">{item.public_id}</td><td>{item.category}</td><td>{item.module}</td><td>{statusLabel(item.status)}</td>
+              <td><Button variant="outline" size="sm" aria-expanded={selectedId === item.public_id}
+                onClick={() => inspect(item.public_id)}>{selectedId === item.public_id ? 'Tutup detail' : 'Lihat progres'}</Button></td>
             </tr>)}</tbody>
           </table></div>}
         <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-          <span>Halaman {listing?.meta.current_page ?? 1} / {listing?.meta.last_page ?? 1}</span>
-          <Button variant="outline" size="sm" disabled={listLoading || page <= 1}
+          <span>Halaman {visibleListing?.meta.current_page ?? 1} / {visibleListing?.meta.last_page ?? 1}</span>
+          <Button variant="outline" size="sm" disabled={visibleListLoading || page <= 1}
             onClick={() => { setListLoading(true); setPage(v => v - 1) }}>Sebelumnya</Button>
-          <Button variant="outline" size="sm" disabled={listLoading || page >= (listing?.meta.last_page ?? 1)}
+          <Button variant="outline" size="sm" disabled={visibleListLoading || page >= (visibleListing?.meta.last_page ?? 1)}
             onClick={() => { setListLoading(true); setPage(v => v + 1) }}>Berikutnya</Button>
         </div>
       </CardContent>
     </Card>
+    {selectedId && <Card>
+      <CardHeader><CardTitle>Progres laporan</CardTitle>
+        <CardDescription>Riwayat status laporan Anda saja. Waktu perubahan status bukan bukti komunikasi langsung atau janji SLA.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {progressLoading && <p role="status" className="text-sm text-muted-foreground">Memuat progres...</p>}
+        {progressError && <p role="alert" className="text-sm text-destructive">Gagal memuat progres. <Button size="sm" variant="outline"
+          onClick={() => { setProgressLoading(true); setProgressError(false); setProgressRevision(v => v + 1) }}>Coba lagi</Button></p>}
+        {progress?.data.public_id === selectedId && !progressError && !progressLoading && <>
+          <p className="break-all font-mono text-xs">{progress.data.public_id}</p>
+          <p className="text-sm">Status saat ini: <span className="font-semibold">{statusLabel(progress.data.status)}</span></p>
+          <p className="text-xs text-muted-foreground">Dibuat: {displayDate(progress.data.created_at)} · Diperbarui: {displayDate(progress.data.updated_at)}</p>
+          <h3 className="text-sm font-semibold">Riwayat perubahan status</h3>
+          {progress.history.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada perubahan status pada laporan ini.</p> :
+            <ol className="space-y-2">{progress.history.map((entry, index) => <li key={`${entry.created_at}-${index}`} className="rounded-lg border p-3 text-sm">
+              <p className="font-medium">{statusLabel(entry.from_status)} → {statusLabel(entry.to_status)}</p>
+              <p className="text-xs text-muted-foreground">{displayDate(entry.created_at)}</p>
+            </li>)}</ol>}
+          <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+            <span>Riwayat {progress.meta.current_page} / {progress.meta.last_page} ({progress.meta.total} perubahan)</span>
+            <Button variant="outline" size="sm" disabled={progressLoading || progressPage <= 1}
+              onClick={() => { setProgressLoading(true); setProgressPage(v => v - 1) }}>Sebelumnya</Button>
+            <Button variant="outline" size="sm" disabled={progressLoading || progressPage >= progress.meta.last_page}
+              onClick={() => { setProgressLoading(true); setProgressPage(v => v + 1) }}>Berikutnya</Button>
+          </div>
+        </>}
+      </CardContent>
+    </Card>}
   </div>
 }

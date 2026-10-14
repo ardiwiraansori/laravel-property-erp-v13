@@ -83,6 +83,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Tenant-scoped incident intake. POST is rate-limited per reporter and company.
     Route::prefix('diagnostics/reports')->middleware('company')->group(function () {
         Route::get('/', [DiagnosticReportController::class, 'index']);
+        Route::get('/{publicId}', [DiagnosticReportController::class, 'show'])
+            ->where('publicId', '[0-9A-HJKMNP-TV-Z]{26}');
         Route::post('/', [DiagnosticReportController::class, 'store'])
             ->middleware('throttle:diagnostics-report');
     });

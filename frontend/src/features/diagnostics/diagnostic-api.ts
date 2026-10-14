@@ -8,6 +8,7 @@ export type DiagnosticImpact = 'blocked' | 'partial' | 'minor' | 'unknown'
 export type DiagnosticErrorKind = 'none' | 'load_failed' | 'permission_denied' | 'timeout' | 'unexpected_result' | 'unknown'
 export type DiagnosticBrowser = 'chrome' | 'edge' | 'firefox' | 'safari' | 'other' | 'unknown'
 export type DiagnosticViewport = 'mobile' | 'tablet' | 'desktop' | 'unknown'
+export type TenantDiagnosticStatus = 'new' | 'triaged' | 'in_progress' | 'resolved' | 'closed'
 
 export type DiagnosticInput = {
   category: DiagnosticCategory
@@ -34,6 +35,11 @@ export type DiagnosticPagination = {
   total: number
 }
 export type DiagnosticPage<T> = { data: T[]; meta: DiagnosticPagination }
+export type TenantDiagnosticProgress = {
+  data: DiagnosticReport & { updated_at: string | null }
+  history: Array<{ from_status: TenantDiagnosticStatus; to_status: TenantDiagnosticStatus; created_at: string }>
+  meta: DiagnosticPagination
+}
 
 export const categories: Array<[DiagnosticCategory, string]> = [
   ['page_error', 'Halaman tidak dapat dibuka'],
@@ -82,6 +88,12 @@ export async function submitDiagnosticReport(input: DiagnosticInput): Promise<Re
 export async function getMyDiagnosticReports(page = 1): Promise<DiagnosticPage<DiagnosticReport>> {
   const response = await api.get<DiagnosticPage<DiagnosticReport>>('/api/diagnostics/reports', {
     params: { page, per_page: 10 },
+  })
+  return response.data
+}
+export async function getMyDiagnosticProgress(publicId: string, page = 1): Promise<TenantDiagnosticProgress> {
+  const response = await api.get<TenantDiagnosticProgress>(`/api/diagnostics/reports/${encodeURIComponent(publicId)}`, {
+    params: { page },
   })
   return response.data
 }
