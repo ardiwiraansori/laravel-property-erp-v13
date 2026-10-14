@@ -30,6 +30,10 @@ function statusLabel(status: string): string {
   return status.replaceAll('_', ' ')
 }
 
+function averageHours(value: number | null): string {
+  return value === null ? '—' : `${value.toFixed(2)} h`
+}
+
 export function PlatformDiagnosticsPage() {
   const [page, setPage] = useState(1)
   const [draft, setDraft] = useState<SupportQueueFilters>({ ...EMPTY_QUEUE_FILTERS })
@@ -142,7 +146,7 @@ export function PlatformDiagnosticsPage() {
     </div>
     <PlatformWriteNotice enabled={write.enabled} loading={write.loading} error={write.error} />
     <Card><CardHeader><CardTitle>Incoming reports</CardTitle>
-      <CardDescription>Read-only workload, age and inactivity insights. Overviews respect company, category and impact, but ignore table-only filters and pagination.</CardDescription></CardHeader>
+      <CardDescription>Read-only workload, age, inactivity and 30-day workflow performance. Overviews respect company, category and impact, but ignore table-only filters and pagination.</CardDescription></CardHeader>
       <CardContent className="space-y-4">
         <form className="flex flex-wrap items-end gap-3" onSubmit={apply}>
           <label className="space-y-1 text-xs font-medium">Company ID
@@ -231,6 +235,23 @@ export function PlatformDiagnosticsPage() {
                 {AGE_BUCKETS.map(([bucket, label]) => <div key={bucket} className="rounded-lg border p-3">
                   <p className="text-xs text-muted-foreground">{label}</p>
                   <p className="text-xl font-semibold tabular-nums">{results.open_inactivity[bucket]}</p>
+                </div>)}
+              </div>
+            </section>}
+            {results && <section aria-label="Workflow performance" className="space-y-2">
+              <div><h3 className="text-sm font-semibold">Workflow performance — last {results.workflow_performance.window_days} days</h3>
+                <p className="text-xs text-muted-foreground">Reports submitted during this rolling period. First triage and first resolution are measured from submission to workflow events. Reopened counts distinct reports, not reopen actions. Not an SLA or evidence of communication.</p></div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {([
+                  ['Reported', results.workflow_performance.reported],
+                  ['First triage reached', results.workflow_performance.triaged],
+                  ['First resolution reached', results.workflow_performance.resolved],
+                  ['Reopened reports', results.workflow_performance.reopened],
+                  ['Awaiting first triage', results.workflow_performance.awaiting_first_triage],
+                  ['Avg. hours to first triage', averageHours(results.workflow_performance.average_hours_to_first_triage)],
+                  ['Avg. hours to first resolution', averageHours(results.workflow_performance.average_hours_to_first_resolution)],
+                ] as Array<[string, string | number]>).map(([label, value]) => <div key={label} className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-semibold tabular-nums">{value}</p>
                 </div>)}
               </div>
             </section>}

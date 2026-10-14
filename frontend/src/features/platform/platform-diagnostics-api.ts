@@ -39,6 +39,16 @@ export type SupportQueueSummary = {
   mine: number
 }
 export type OpenAgingSummary = { total: number } & Record<OpenAgeBucket, number>
+export type WorkflowPerformanceSummary = {
+  window_days: number
+  reported: number
+  triaged: number
+  resolved: number
+  reopened: number
+  awaiting_first_triage: number
+  average_hours_to_first_triage: number | null
+  average_hours_to_first_resolution: number | null
+}
 export type PlatformReport = {
   public_id: string
   company_id: number
@@ -56,7 +66,12 @@ export type PlatformReport = {
   created_at: string | null
   updated_at: string | null
 }
-export type PlatformReportPage = DiagnosticPage<PlatformReport> & { summary: SupportQueueSummary; open_aging: OpenAgingSummary; open_inactivity: OpenAgingSummary }
+export type PlatformReportPage = DiagnosticPage<PlatformReport> & {
+  summary: SupportQueueSummary
+  open_aging: OpenAgingSummary
+  open_inactivity: OpenAgingSummary
+  workflow_performance: WorkflowPerformanceSummary
+}
 export type WorkflowHistory = {
   action: 'status_changed' | 'assignment_changed'
   actor_user_id: number

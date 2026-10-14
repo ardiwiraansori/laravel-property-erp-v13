@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Platform;
 use App\Http\Controllers\Controller;
 use App\Models\DiagnosticReport;
 use App\Support\Diagnostics\DiagnosticFields;
+use App\Support\Diagnostics\DiagnosticPerformance;
 use App\Support\Diagnostics\DiagnosticWorkflow;
 use App\Support\Platform\PlatformDirectoryAudit;
 use Illuminate\Http\JsonResponse;
@@ -17,8 +18,10 @@ final class PlatformDiagnosticController extends Controller
     /** Active ticket age, measured since initial reporting (not an SLA). */
     private const OPEN_STATUSES = ['new', 'triaged', 'in_progress'];
 
-    public function __construct(private readonly PlatformDirectoryAudit $audit)
-    {
+    public function __construct(
+        private readonly PlatformDirectoryAudit $audit,
+        private readonly DiagnosticPerformance $performance,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -89,6 +92,10 @@ final class PlatformDiagnosticController extends Controller
                 'SUM(CASE WHEN '.$lastActivity.' <= ? THEN 1 ELSE 0 END) as over_7d',
                 [$cutoff24, $cutoff72, $cutoff24, $cutoff168, $cutoff72, $cutoff168],
             )->first();
+
+        // Rolling-cohort workflow metrics are computed from existing append-only
+        // status events, under the same base company/category/impact scope.
+        $performance = $this->performance->summarize(clone $scope, $now);
 
         $actorId = (int) $request->user()->getAuthIdentifier();
         $workload = (clone $scope)->selectRaw(
@@ -220,6 +227,7 @@ final class PlatformDiagnosticController extends Controller
                 'day_3_7' => (int) ($inactivity?->day_3_7 ?? 0),
                 'over_7d' => (int) ($inactivity?->over_7d ?? 0),
             ],
+            'workflow_performance' => $performance,
         ])->header('X-Request-ID', $requestId);
     }
 }
