@@ -32,7 +32,8 @@ final class PlatformDiagnosticController extends Controller
             'status' => ['sometimes', Rule::in(DiagnosticWorkflow::STATUSES)],
             'assignment' => ['sometimes', Rule::in(['all', 'mine', 'assigned', 'unassigned'])],
             'age' => ['sometimes', Rule::in(['under_24h', 'day_1_3', 'day_3_7', 'over_7d'])],
-            'sort' => ['sometimes', Rule::in(['newest', 'oldest'])],
+            'inactivity' => ['sometimes', Rule::in(['under_24h', 'day_1_3', 'day_3_7', 'over_7d'])],
+            'sort' => ['sometimes', Rule::in(['newest', 'oldest', 'stale_first', 'recent_activity'])],
         ]);
 
         // The overview intentionally ignores status and assignment filters so the
@@ -74,6 +75,21 @@ final class PlatformDiagnosticController extends Controller
                 [$cutoff24, $cutoff72, $cutoff24, $cutoff168, $cutoff72, $cutoff168],
             )->first();
 
+        // Inactivity is time since the report row was last modified, not time since
+        // its creation. Both allowed workflow mutations update updated_at. For
+        // legacy rows with no updated_at, fall back to creation timestamp.
+        // This is not an SLA or evidence of any support communication.
+        $lastActivity = 'COALESCE(updated_at, created_at)';
+        $inactivity = (clone $scope)->whereIn('status', self::OPEN_STATUSES)
+            ->selectRaw(
+                'COUNT(*) as total, '.
+                'SUM(CASE WHEN '.$lastActivity.' > ? THEN 1 ELSE 0 END) as under_24h, '.
+                'SUM(CASE WHEN '.$lastActivity.' > ? AND '.$lastActivity.' <= ? THEN 1 ELSE 0 END) as day_1_3, '.
+                'SUM(CASE WHEN '.$lastActivity.' > ? AND '.$lastActivity.' <= ? THEN 1 ELSE 0 END) as day_3_7, '.
+                'SUM(CASE WHEN '.$lastActivity.' <= ? THEN 1 ELSE 0 END) as over_7d',
+                [$cutoff24, $cutoff72, $cutoff24, $cutoff168, $cutoff72, $cutoff168],
+            )->first();
+
         $actorId = (int) $request->user()->getAuthIdentifier();
         $workload = (clone $scope)->selectRaw(
             'COUNT(*) as total, '.
@@ -87,7 +103,7 @@ final class PlatformDiagnosticController extends Controller
         $query = (clone $scope)->select([
             'id', 'public_id', 'company_id', 'reporter_user_id', 'category',
             'module', 'impact', 'error_kind', 'browser_family', 'viewport',
-            'status', 'assigned_platform_admin_user_id', 'workflow_version', 'created_at',
+            'status', 'assigned_platform_admin_user_id', 'workflow_version', 'created_at', 'updated_at',
         ])->with('company:id,code');
         if (isset($params['status'])) {
             $query->where('status', $params['status']);
@@ -122,11 +138,39 @@ final class PlatformDiagnosticController extends Controller
                     break;
             }
         }
-        // Created-at + ID tie-breaker is deterministic across every page.
-        if (($params['sort'] ?? 'newest') === 'oldest') {
-            $query->orderBy('created_at')->orderBy('id');
-        } else {
-            $query->orderByDesc('created_at')->orderByDesc('id');
+        if (isset($params['inactivity'])) {
+            // Inactivity always selects open reports and intersects with any
+            // status, age, assignment, company, category and impact filters.
+            $query->whereIn('status', self::OPEN_STATUSES);
+            switch ($params['inactivity']) {
+                case 'under_24h':
+                    $query->whereRaw($lastActivity.' > ?', [$cutoff24]);
+                    break;
+                case 'day_1_3':
+                    $query->whereRaw($lastActivity.' > ? AND '.$lastActivity.' <= ?', [$cutoff72, $cutoff24]);
+                    break;
+                case 'day_3_7':
+                    $query->whereRaw($lastActivity.' > ? AND '.$lastActivity.' <= ?', [$cutoff168, $cutoff72]);
+                    break;
+                case 'over_7d':
+                    $query->whereRaw($lastActivity.' <= ?', [$cutoff168]);
+                    break;
+            }
+        }
+
+        // Stable ID tie-breaker is mandatory for deterministic pagination.
+        switch ($params['sort'] ?? 'newest') {
+            case 'oldest':
+                $query->orderBy('created_at')->orderBy('id');
+                break;
+            case 'stale_first':
+                $query->orderByRaw($lastActivity.' ASC')->orderBy('id');
+                break;
+            case 'recent_activity':
+                $query->orderByRaw($lastActivity.' DESC')->orderByDesc('id');
+                break;
+            default:
+                $query->orderByDesc('created_at')->orderByDesc('id');
         }
         $page = $query->paginate((int) ($params['per_page'] ?? 20));
         $requestId = $this->audit->record($request, 'platform.diagnostics.read');
@@ -147,6 +191,7 @@ final class PlatformDiagnosticController extends Controller
                 'assigned_platform_admin_user_id' => $report->assigned_platform_admin_user_id,
                 'workflow_version' => (int) $report->workflow_version,
                 'created_at' => $report->created_at?->toIso8601String(),
+                'updated_at' => ($report->updated_at ?? $report->created_at)?->toIso8601String(),
             ])->values(),
             'meta' => [
                 'current_page' => $page->currentPage(),
@@ -167,6 +212,13 @@ final class PlatformDiagnosticController extends Controller
                 'day_1_3' => (int) ($aging?->day_1_3 ?? 0),
                 'day_3_7' => (int) ($aging?->day_3_7 ?? 0),
                 'over_7d' => (int) ($aging?->over_7d ?? 0),
+            ],
+            'open_inactivity' => [
+                'total' => (int) ($inactivity?->total ?? 0),
+                'under_24h' => (int) ($inactivity?->under_24h ?? 0),
+                'day_1_3' => (int) ($inactivity?->day_1_3 ?? 0),
+                'day_3_7' => (int) ($inactivity?->day_3_7 ?? 0),
+                'over_7d' => (int) ($inactivity?->over_7d ?? 0),
             ],
         ])->header('X-Request-ID', $requestId);
     }

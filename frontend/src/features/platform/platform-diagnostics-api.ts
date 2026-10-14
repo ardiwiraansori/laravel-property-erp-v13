@@ -25,10 +25,11 @@ export type SupportQueueFilters = {
   impact: string
   assignment: AssignmentScope
   age: OpenAgeBucket | ''
-  sort: 'newest' | 'oldest'
+  inactivity: OpenAgeBucket | ''
+  sort: 'newest' | 'oldest' | 'stale_first' | 'recent_activity'
 }
 export const EMPTY_QUEUE_FILTERS: SupportQueueFilters = {
-  companyId: '', status: '', category: '', impact: '', assignment: 'all', age: '', sort: 'newest',
+  companyId: '', status: '', category: '', impact: '', assignment: 'all', age: '', inactivity: '', sort: 'newest',
 }
 export type SupportQueueSummary = {
   total: number
@@ -53,8 +54,9 @@ export type PlatformReport = {
   assigned_platform_admin_user_id: number | null
   workflow_version: number
   created_at: string | null
+  updated_at: string | null
 }
-export type PlatformReportPage = DiagnosticPage<PlatformReport> & { summary: SupportQueueSummary; open_aging: OpenAgingSummary }
+export type PlatformReportPage = DiagnosticPage<PlatformReport> & { summary: SupportQueueSummary; open_aging: OpenAgingSummary; open_inactivity: OpenAgingSummary }
 export type WorkflowHistory = {
   action: 'status_changed' | 'assignment_changed'
   actor_user_id: number
@@ -81,6 +83,7 @@ export async function getPlatformReports(page: number, filters: SupportQueueFilt
       ...(filters.impact ? { impact: filters.impact } : {}),
       ...(filters.assignment !== 'all' ? { assignment: filters.assignment } : {}),
       ...(filters.age ? { age: filters.age } : {}),
+      ...(filters.inactivity ? { inactivity: filters.inactivity } : {}),
       ...(filters.sort !== 'newest' ? { sort: filters.sort } : {}),
     },
   })

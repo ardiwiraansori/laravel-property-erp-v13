@@ -142,7 +142,7 @@ export function PlatformDiagnosticsPage() {
     </div>
     <PlatformWriteNotice enabled={write.enabled} loading={write.loading} error={write.error} />
     <Card><CardHeader><CardTitle>Incoming reports</CardTitle>
-      <CardDescription>Read-only workload and age insights; overviews respect company, category and impact filters, but ignore table status, assignment, age and pagination.</CardDescription></CardHeader>
+      <CardDescription>Read-only workload, age and inactivity insights. Overviews respect company, category and impact, but ignore table-only filters and pagination.</CardDescription></CardHeader>
       <CardContent className="space-y-4">
         <form className="flex flex-wrap items-end gap-3" onSubmit={apply}>
           <label className="space-y-1 text-xs font-medium">Company ID
@@ -181,10 +181,19 @@ export function PlatformDiagnosticsPage() {
               {AGE_BUCKETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
-          <label className="space-y-1 text-xs font-medium">Sort by reported time
-            <select className="block h-9 w-32 rounded-lg border border-input bg-background px-2 text-sm" value={draft.sort}
+          <label className="space-y-1 text-xs font-medium">Open report inactivity
+            <select className="block h-9 w-44 rounded-lg border border-input bg-background px-2 text-sm" value={draft.inactivity}
+              onChange={e => updateDraft('inactivity', e.target.value as OpenAgeBucket | '')}>
+              <option value="">All inactivity durations</option>
+              {AGE_BUCKETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-medium">Sort by
+            <select className="block h-9 w-56 rounded-lg border border-input bg-background px-2 text-sm" value={draft.sort}
               onChange={e => updateDraft('sort', e.target.value as SupportQueueFilters['sort'])}>
-              <option value="newest">Newest first</option><option value="oldest">Oldest first</option>
+              <option value="newest">Newest reported first</option><option value="oldest">Oldest reported first</option>
+              <option value="stale_first">Least recently updated first</option>
+              <option value="recent_activity">Most recently updated first</option>
             </select>
           </label>
           <Button type="submit">Filter</Button><Button type="button" variant="outline" onClick={clear}>Reset</Button>
@@ -213,12 +222,24 @@ export function PlatformDiagnosticsPage() {
                 </div>)}
               </div>
             </section>}
+            {results && <section aria-label="Open report inactivity" className="space-y-2">
+              <div><h3 className="text-sm font-semibold">Open report inactivity</h3>
+                <p className="text-xs text-muted-foreground">Time since the report was last updated (not an SLA). Only new, triaged and in-progress reports are included. Initial submission and later status/assignment changes update this timestamp.</p></div>
+              <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Open total</p>
+                  <p className="text-xl font-semibold tabular-nums">{results.open_inactivity.total}</p></div>
+                {AGE_BUCKETS.map(([bucket, label]) => <div key={bucket} className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-xl font-semibold tabular-nums">{results.open_inactivity[bucket]}</p>
+                </div>)}
+              </div>
+            </section>}
             {results?.data.length === 0 ? <p className="text-sm text-muted-foreground">No reports found for the selected queue filters.</p> :
-              <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left text-xs">
+              <div className="overflow-x-auto"><table className="w-full min-w-[1200px] text-left text-xs">
                 <thead><tr className="border-b">
                   <th className="py-2 pr-3">Report ID</th><th className="pr-3">Company</th><th className="pr-3">Reporter ID</th>
                   <th className="pr-3">Module</th><th className="pr-3">Category</th><th className="pr-3">Impact</th>
-                  <th className="pr-3">Browser / Viewport</th><th className="pr-3">Reported at</th><th className="pr-3">Status</th><th className="pr-3">Assigned ID</th><th>Action</th>
+                  <th className="pr-3">Browser / Viewport</th><th className="pr-3">Reported at</th><th className="pr-3">Last updated</th><th className="pr-3">Status</th><th className="pr-3">Assigned ID</th><th>Action</th>
                 </tr></thead>
                 <tbody>{results?.data.map(row => <tr className="border-b last:border-0" key={row.public_id}>
                   <td className="py-2 pr-3 font-mono">{row.public_id}</td><td className="pr-3">{row.company_code}</td>
@@ -226,6 +247,7 @@ export function PlatformDiagnosticsPage() {
                   <td className="pr-3">{row.category}</td><td className="pr-3">{row.impact}</td>
                   <td className="pr-3">{row.browser_family} / {row.viewport}</td>
                   <td className="pr-3">{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</td>
+                  <td className="pr-3">{row.updated_at ? new Date(row.updated_at).toLocaleString() : '—'}</td>
                   <td className="pr-3">{statusLabel(row.status)}</td>
                   <td className="pr-3">{row.assigned_platform_admin_user_id ?? '—'}</td>
                   <td><Button size="sm" variant="outline" onClick={() => inspect(row.public_id)}>Inspect</Button></td>
