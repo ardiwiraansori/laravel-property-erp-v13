@@ -11,15 +11,24 @@ export const NEXT_STATUSES: Record<DiagnosticStatus, DiagnosticStatus[]> = {
 }
 export const DIAGNOSTIC_STATUSES: DiagnosticStatus[] = ['new', 'triaged', 'in_progress', 'resolved', 'closed']
 export type AssignmentScope = 'all' | 'mine' | 'assigned' | 'unassigned'
+export type OpenAgeBucket = 'under_24h' | 'day_1_3' | 'day_3_7' | 'over_7d'
+export const AGE_BUCKETS: Array<[OpenAgeBucket, string]> = [
+  ['under_24h', 'Under 24 hours'],
+  ['day_1_3', '1 to <3 days'],
+  ['day_3_7', '3 to <7 days'],
+  ['over_7d', '7 days or more'],
+]
 export type SupportQueueFilters = {
   companyId: string
   status: string
   category: string
   impact: string
   assignment: AssignmentScope
+  age: OpenAgeBucket | ''
+  sort: 'newest' | 'oldest'
 }
 export const EMPTY_QUEUE_FILTERS: SupportQueueFilters = {
-  companyId: '', status: '', category: '', impact: '', assignment: 'all',
+  companyId: '', status: '', category: '', impact: '', assignment: 'all', age: '', sort: 'newest',
 }
 export type SupportQueueSummary = {
   total: number
@@ -28,6 +37,7 @@ export type SupportQueueSummary = {
   unassigned: number
   mine: number
 }
+export type OpenAgingSummary = { total: number } & Record<OpenAgeBucket, number>
 export type PlatformReport = {
   public_id: string
   company_id: number
@@ -44,7 +54,7 @@ export type PlatformReport = {
   workflow_version: number
   created_at: string | null
 }
-export type PlatformReportPage = DiagnosticPage<PlatformReport> & { summary: SupportQueueSummary }
+export type PlatformReportPage = DiagnosticPage<PlatformReport> & { summary: SupportQueueSummary; open_aging: OpenAgingSummary }
 export type WorkflowHistory = {
   action: 'status_changed' | 'assignment_changed'
   actor_user_id: number
@@ -70,6 +80,8 @@ export async function getPlatformReports(page: number, filters: SupportQueueFilt
       ...(filters.category ? { category: filters.category } : {}),
       ...(filters.impact ? { impact: filters.impact } : {}),
       ...(filters.assignment !== 'all' ? { assignment: filters.assignment } : {}),
+      ...(filters.age ? { age: filters.age } : {}),
+      ...(filters.sort !== 'newest' ? { sort: filters.sort } : {}),
     },
   })
   return response.data

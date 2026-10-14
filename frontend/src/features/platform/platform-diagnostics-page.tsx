@@ -9,12 +9,12 @@ import { usePlatformWriteStatus } from '@/features/platform/use-platform-write-s
 import { PlatformWriteNotice } from '@/features/platform/platform-write-status'
 import { categories, impacts } from '@/features/diagnostics/diagnostic-api'
 import {
-  DIAGNOSTIC_STATUSES, EMPTY_QUEUE_FILTERS, NEXT_STATUSES,
+  AGE_BUCKETS, DIAGNOSTIC_STATUSES, EMPTY_QUEUE_FILTERS, NEXT_STATUSES,
   changeDiagnosticAssignee, changeDiagnosticStatus,
   getDiagnosticAssignees, getPlatformReportDetail, getPlatformReports,
 } from '@/features/platform/platform-diagnostics-api'
 import type {
-  Assignee, DiagnosticStatus, PlatformReportPage, ReportDetail, SupportQueueFilters,
+  Assignee, DiagnosticStatus, OpenAgeBucket, PlatformReportPage, ReportDetail, SupportQueueFilters,
 } from '@/features/platform/platform-diagnostics-api'
 
 function readableError(error: unknown): string {
@@ -142,7 +142,7 @@ export function PlatformDiagnosticsPage() {
     </div>
     <PlatformWriteNotice enabled={write.enabled} loading={write.loading} error={write.error} />
     <Card><CardHeader><CardTitle>Incoming reports</CardTitle>
-      <CardDescription>Read-only workload insights, filters and audit. Summary covers all statuses and assignments within the selected company, category and impact.</CardDescription></CardHeader>
+      <CardDescription>Read-only workload and age insights; overviews respect company, category and impact filters, but ignore table status, assignment, age and pagination.</CardDescription></CardHeader>
       <CardContent className="space-y-4">
         <form className="flex flex-wrap items-end gap-3" onSubmit={apply}>
           <label className="space-y-1 text-xs font-medium">Company ID
@@ -174,6 +174,19 @@ export function PlatformDiagnosticsPage() {
               <option value="unassigned">Unassigned</option><option value="assigned">Assigned</option>
             </select>
           </label>
+          <label className="space-y-1 text-xs font-medium">Open report age
+            <select className="block h-9 w-40 rounded-lg border border-input bg-background px-2 text-sm" value={draft.age}
+              onChange={e => updateDraft('age', e.target.value as OpenAgeBucket | '')}>
+              <option value="">All ages</option>
+              {AGE_BUCKETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-medium">Sort by reported time
+            <select className="block h-9 w-32 rounded-lg border border-input bg-background px-2 text-sm" value={draft.sort}
+              onChange={e => updateDraft('sort', e.target.value as SupportQueueFilters['sort'])}>
+              <option value="newest">Newest first</option><option value="oldest">Oldest first</option>
+            </select>
+          </label>
           <Button type="submit">Filter</Button><Button type="button" variant="outline" onClick={clear}>Reset</Button>
         </form>
         {error ? <p role="alert" className="text-sm text-destructive">Failed to load reports. <Button variant="outline" size="sm"
@@ -188,18 +201,32 @@ export function PlatformDiagnosticsPage() {
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Assigned</p><p className="text-xl font-semibold tabular-nums">{results.summary.assigned}</p></div>
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Assigned to me</p><p className="text-xl font-semibold tabular-nums">{results.summary.mine}</p></div>
             </section>}
+            {results && <section aria-label="Open report aging" className="space-y-2">
+              <div><h3 className="text-sm font-semibold">Open report aging</h3>
+                <p className="text-xs text-muted-foreground">Age since submission (not an SLA). Only new, triaged and in-progress reports are counted. Select an age filter to inspect the matching open reports.</p></div>
+              <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Open total</p>
+                  <p className="text-xl font-semibold tabular-nums">{results.open_aging.total}</p></div>
+                {AGE_BUCKETS.map(([bucket, label]) => <div key={bucket} className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-xl font-semibold tabular-nums">{results.open_aging[bucket]}</p>
+                </div>)}
+              </div>
+            </section>}
             {results?.data.length === 0 ? <p className="text-sm text-muted-foreground">No reports found for the selected queue filters.</p> :
               <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left text-xs">
                 <thead><tr className="border-b">
                   <th className="py-2 pr-3">Report ID</th><th className="pr-3">Company</th><th className="pr-3">Reporter ID</th>
                   <th className="pr-3">Module</th><th className="pr-3">Category</th><th className="pr-3">Impact</th>
-                  <th className="pr-3">Browser / Viewport</th><th className="pr-3">Status</th><th className="pr-3">Assigned ID</th><th>Action</th>
+                  <th className="pr-3">Browser / Viewport</th><th className="pr-3">Reported at</th><th className="pr-3">Status</th><th className="pr-3">Assigned ID</th><th>Action</th>
                 </tr></thead>
                 <tbody>{results?.data.map(row => <tr className="border-b last:border-0" key={row.public_id}>
                   <td className="py-2 pr-3 font-mono">{row.public_id}</td><td className="pr-3">{row.company_code}</td>
                   <td className="pr-3">{row.reporter_user_id}</td><td className="pr-3">{row.module}</td>
                   <td className="pr-3">{row.category}</td><td className="pr-3">{row.impact}</td>
-                  <td className="pr-3">{row.browser_family} / {row.viewport}</td><td className="pr-3">{statusLabel(row.status)}</td>
+                  <td className="pr-3">{row.browser_family} / {row.viewport}</td>
+                  <td className="pr-3">{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</td>
+                  <td className="pr-3">{statusLabel(row.status)}</td>
                   <td className="pr-3">{row.assigned_platform_admin_user_id ?? '—'}</td>
                   <td><Button size="sm" variant="outline" onClick={() => inspect(row.public_id)}>Inspect</Button></td>
                 </tr>)}</tbody>

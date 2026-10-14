@@ -14,6 +14,9 @@ use Illuminate\Validation\Rule;
 /** Metadata-only support intake; no tenant business data or user impersonation. */
 final class PlatformDiagnosticController extends Controller
 {
+    /** Active ticket age, measured since initial reporting (not an SLA). */
+    private const OPEN_STATUSES = ['new', 'triaged', 'in_progress'];
+
     public function __construct(private readonly PlatformDirectoryAudit $audit)
     {
     }
@@ -28,6 +31,8 @@ final class PlatformDiagnosticController extends Controller
             'impact' => ['sometimes', Rule::in(DiagnosticFields::IMPACTS)],
             'status' => ['sometimes', Rule::in(DiagnosticWorkflow::STATUSES)],
             'assignment' => ['sometimes', Rule::in(['all', 'mine', 'assigned', 'unassigned'])],
+            'age' => ['sometimes', Rule::in(['under_24h', 'day_1_3', 'day_3_7', 'over_7d'])],
+            'sort' => ['sometimes', Rule::in(['newest', 'oldest'])],
         ]);
 
         // The overview intentionally ignores status and assignment filters so the
@@ -51,6 +56,23 @@ final class PlatformDiagnosticController extends Controller
                 $statusCounts[$row->status] = (int) $row->report_count;
             }
         }
+
+        // Bucket edges: <24h, [24h, 72h), [72h, 168h), >=168h.
+        // Exact boundaries are assigned to the older bucket; future-dated
+        // records are grouped into the newest bucket, not exposed separately.
+        $now = now();
+        $cutoff24 = $now->copy()->subHours(24);
+        $cutoff72 = $now->copy()->subHours(72);
+        $cutoff168 = $now->copy()->subHours(168);
+        $aging = (clone $scope)->whereIn('status', self::OPEN_STATUSES)
+            ->selectRaw(
+                'COUNT(*) as total, '.
+                'SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as under_24h, '.
+                'SUM(CASE WHEN created_at > ? AND created_at <= ? THEN 1 ELSE 0 END) as day_1_3, '.
+                'SUM(CASE WHEN created_at > ? AND created_at <= ? THEN 1 ELSE 0 END) as day_3_7, '.
+                'SUM(CASE WHEN created_at <= ? THEN 1 ELSE 0 END) as over_7d',
+                [$cutoff24, $cutoff72, $cutoff24, $cutoff168, $cutoff72, $cutoff168],
+            )->first();
 
         $actorId = (int) $request->user()->getAuthIdentifier();
         $workload = (clone $scope)->selectRaw(
@@ -82,7 +104,31 @@ final class PlatformDiagnosticController extends Controller
                 break;
         }
 
-        $page = $query->orderByDesc('id')->paginate((int) ($params['per_page'] ?? 20));
+        if (isset($params['age'])) {
+            // An age lane always represents outstanding (not resolved/closed) reports.
+            $query->whereIn('status', self::OPEN_STATUSES);
+            switch ($params['age']) {
+                case 'under_24h':
+                    $query->where('created_at', '>', $cutoff24);
+                    break;
+                case 'day_1_3':
+                    $query->where('created_at', '>', $cutoff72)->where('created_at', '<=', $cutoff24);
+                    break;
+                case 'day_3_7':
+                    $query->where('created_at', '>', $cutoff168)->where('created_at', '<=', $cutoff72);
+                    break;
+                case 'over_7d':
+                    $query->where('created_at', '<=', $cutoff168);
+                    break;
+            }
+        }
+        // Created-at + ID tie-breaker is deterministic across every page.
+        if (($params['sort'] ?? 'newest') === 'oldest') {
+            $query->orderBy('created_at')->orderBy('id');
+        } else {
+            $query->orderByDesc('created_at')->orderByDesc('id');
+        }
+        $page = $query->paginate((int) ($params['per_page'] ?? 20));
         $requestId = $this->audit->record($request, 'platform.diagnostics.read');
 
         return response()->json([
@@ -114,6 +160,13 @@ final class PlatformDiagnosticController extends Controller
                 'unassigned' => $unassigned,
                 'assigned' => $total - $unassigned,
                 'mine' => (int) ($workload?->mine ?? 0),
+            ],
+            'open_aging' => [
+                'total' => (int) ($aging?->total ?? 0),
+                'under_24h' => (int) ($aging?->under_24h ?? 0),
+                'day_1_3' => (int) ($aging?->day_1_3 ?? 0),
+                'day_3_7' => (int) ($aging?->day_3_7 ?? 0),
+                'over_7d' => (int) ($aging?->over_7d ?? 0),
             ],
         ])->header('X-Request-ID', $requestId);
     }
