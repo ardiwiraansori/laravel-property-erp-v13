@@ -4,7 +4,16 @@ import {
   createBrowserRouter,
 } from 'react-router'
 
-import { DashboardPage } from '@/components/dashboard/dashboard-page'
+import {
+  DashboardPage,
+  DeferredPage,
+  PlatformCompaniesPage,
+  PlatformDiagnosticsPage,
+  PlatformOverviewPage,
+  PlatformUsersPage,
+  PropertyDevelopmentsPage,
+  ReportProblemPage,
+} from '@/app/deferred-pages'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { PlatformLayout } from '@/components/layout/platform-layout'
 import { ModulePlaceholderPage } from '@/components/module/module-placeholder-page'
@@ -14,14 +23,8 @@ import { PermissionRoute } from '@/features/auth/permission-route'
 import { permissions } from '@/features/auth/permissions'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { CompanyProvider } from '@/features/company/company-context'
-import { ReportProblemPage } from '@/features/diagnostics/report-problem-page'
-import { PlatformDiagnosticsPage } from '@/features/platform/platform-diagnostics-page'
-import { PropertyDevelopmentsPage } from '@/features/master-data/property-developments/property-developments-page'
-import { PlatformCompaniesPage } from '@/features/platform/platform-companies-page'
 import { PlatformMfaPage } from '@/features/platform/platform-mfa-page'
-import { PlatformOverviewPage } from '@/features/platform/platform-overview-page'
 import { PlatformRoute } from '@/features/platform/platform-route'
-import { PlatformUsersPage } from '@/features/platform/platform-users-page'
 import { NotFoundPage } from '@/pages/not-found-page'
 
 export const router = createBrowserRouter([
@@ -35,10 +38,10 @@ export const router = createBrowserRouter([
     children: [{
       element: <PlatformLayout />,
       children: [
-        { index: true, element: <PlatformOverviewPage /> },
-        { path: 'companies', element: <PlatformCompaniesPage /> },
-        { path: 'diagnostics', element: <PlatformDiagnosticsPage /> },
-        { path: 'users', element: <PlatformUsersPage /> },
+        { index: true, element: <DeferredPage><PlatformOverviewPage /></DeferredPage> },
+        { path: 'companies', element: <DeferredPage><PlatformCompaniesPage /></DeferredPage> },
+        { path: 'diagnostics', element: <DeferredPage><PlatformDiagnosticsPage /></DeferredPage> },
+        { path: 'users', element: <DeferredPage><PlatformUsersPage /></DeferredPage> },
         { path: '*', element: <NotFoundPage /> },
       ],
     }],
@@ -49,11 +52,11 @@ export const router = createBrowserRouter([
       {
         element: <DashboardLayout />,
         children: [
-          { path: 'report-problem', element: <ReportProblemPage /> },
+          { path: 'report-problem', element: <DeferredPage><ReportProblemPage /></DeferredPage> },
           {
             path: 'dashboard',
             element: <PermissionRoute permission={permissions.dashboardView}>
-              <DashboardPage />
+              <DeferredPage><DashboardPage /></DeferredPage>
             </PermissionRoute>,
           },
           {
@@ -66,7 +69,7 @@ export const router = createBrowserRouter([
               {
                 path: 'property-developments',
                 element: <PermissionRoute permission={permissions.propertyDevelopmentsView}>
-                  <PropertyDevelopmentsPage />
+                  <DeferredPage><PropertyDevelopmentsPage /></DeferredPage>
                 </PermissionRoute>,
               },
             ],
