@@ -28,4 +28,3 @@ export function DeferredPage({ children }: { children: ReactNode }) {
     </Suspense>
   )
 }
-
