@@ -1,6 +1,6 @@
 import axios from 'axios'
-import { Plus } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Plus, Search } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -13,14 +13,13 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { hasPermission, permissions } from '@/features/auth/permissions'
 import { useCompany } from '@/features/company/company-state'
 import {
-  hasPermission,
-  permissions,
-} from '@/features/auth/permissions'
-import {
   createPropertyDevelopment,
-  getPropertyDevelopments,
+  getPropertyDevelopmentDirectory,
+  type DirectoryMeta,
+  type DirectoryStatus,
   type PropertyDevelopment,
 } from '@/features/master-data/property-developments/property-development-api'
 
@@ -37,20 +36,28 @@ type FieldErrors = {
   name?: string
 }
 
+const PAGE_SIZE = 10
+
 export function PropertyDevelopmentsPage() {
   const { activeCompany } = useCompany()
+  const companyId = activeCompany?.id
 
-  const [developments, setDevelopments] = useState<
-    PropertyDevelopment[]
-  >([])
+  const [developments, setDevelopments] = useState<PropertyDevelopment[]>([])
+  const [meta, setMeta] = useState<DirectoryMeta | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
+
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<DirectoryStatus>('all')
+  const [page, setPage] = useState(1)
 
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
-  const [fieldErrors, setFieldErrors] =
-    useState<FieldErrors>({})
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
+  const [formSuccess, setFormSuccess] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const canCreate =
@@ -60,150 +67,157 @@ export function PropertyDevelopmentsPage() {
       permissions.propertyDevelopmentsCreate,
     )
 
-  const loadDevelopments = useCallback(async () => {
-    setIsLoading(true)
-    setLoadError(null)
-
-    try {
-      const data = await getPropertyDevelopments()
-      setDevelopments(data)
-    } catch {
-      setLoadError(
-        'Unable to load property developments. Please try again.',
-      )
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
-    let active = true
+    let current = true
 
-    void getPropertyDevelopments()
-      .then((data) => {
-        if (!active) {
-          return
-        }
-
-        setDevelopments(data)
+    // Every query is associated with the currently resolved tenant. When it
+    // changes, the old response must not update another tenant's directory.
+    void getPropertyDevelopmentDirectory({ page, perPage: PAGE_SIZE, search, status })
+      .then((response) => {
+        if (!current) return
+        setDevelopments(response.data)
+        setMeta(response.meta)
         setLoadError(null)
       })
       .catch(() => {
-        if (!active) {
-          return
-        }
-
-        setLoadError(
-          'Unable to load property developments. Please try again.',
-        )
+        if (!current) return
+        setDevelopments([])
+        setMeta(null)
+        setLoadError('Unable to load property developments. Please try again.')
       })
       .finally(() => {
-        if (active) {
-          setIsLoading(false)
-        }
+        if (current) setIsLoading(false)
       })
 
     return () => {
-      active = false
+      current = false
     }
-  }, [])
+  }, [companyId, page, revision, search, status])
+
+  function applySearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsLoading(true)
+    setPage(1)
+    setSearch(searchInput.trim())
+    setRevision((value) => value + 1)
+  }
+
+  function changeStatus(value: DirectoryStatus) {
+    setIsLoading(true)
+    setPage(1)
+    setStatus(value)
+  }
+
+  function resetFilters() {
+    setIsLoading(true)
+    setSearchInput('')
+    setSearch('')
+    setStatus('all')
+    setPage(1)
+    setRevision((value) => value + 1)
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-
     setFieldErrors({})
     setFormError(null)
+    setFormSuccess(null)
     setIsSubmitting(true)
 
     try {
-      await createPropertyDevelopment({
-        code,
-        name,
-      })
-
+      await createPropertyDevelopment({ code, name })
       setCode('')
       setName('')
-
-      await loadDevelopments()
+      setFormSuccess('Development created. The directory has been refreshed.')
+      resetFilters()
     } catch (error) {
-      if (
-        axios.isAxiosError<ValidationResponse>(error) &&
-        error.response?.status === 422
-      ) {
+      if (axios.isAxiosError<ValidationResponse>(error) && error.response?.status === 422) {
         setFieldErrors({
           code: error.response.data.errors?.code?.[0],
           name: error.response.data.errors?.name?.[0],
         })
-
-        setFormError(
-          error.response.data.message ??
-            'Please review the submitted data.',
-        )
+        setFormError(error.response.data.message ?? 'Please review the submitted data.')
       } else {
-        setFormError(
-          'Unable to create the property development.',
-        )
+        setFormError('Unable to create the property development.')
       }
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const firstItem = meta && meta.total > 0
+    ? (meta.current_page - 1) * meta.per_page + 1
+    : 0
+  const lastItem = meta
+    ? Math.min(meta.current_page * meta.per_page, meta.total)
+    : 0
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Property Developments
-        </h1>
-
+        <h1 className="text-2xl font-semibold tracking-tight">Property Developments</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Manage housing developments used across Property ERP.
         </p>
       </div>
 
-      <div
-        className={
-          canCreate
-            ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]'
-            : 'space-y-6'
-        }
-      >
+      <div className={canCreate ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]' : 'space-y-6'}>
         <Card>
           <CardHeader>
             <CardTitle>Developments</CardTitle>
-
-            <CardDescription>
-              Core property development master data.
-            </CardDescription>
+            <CardDescription>Search and filter core property master data in your active company.</CardDescription>
           </CardHeader>
-
-          <CardContent>
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground">
-                Loading property developments...
-              </p>
-            ) : loadError ? (
-              <div className="space-y-3">
-                <p className="text-sm text-destructive">
-                  {loadError}
-                </p>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void loadDevelopments()}
-                >
-                  Try again
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <form onSubmit={applySearch} className="flex min-w-0 flex-1 items-end gap-2">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Label htmlFor="development-search">Search by code or name</Label>
+                  <Input
+                    id="development-search"
+                    name="search"
+                    value={searchInput}
+                    maxLength={100}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Search developments"
+                  />
+                </div>
+                <Button type="submit" variant="outline" disabled={isLoading}>
+                  <Search /> Search
                 </Button>
+              </form>
+              <div className="space-y-1">
+                <Label htmlFor="development-status">Status</Label>
+                <select
+                  id="development-status"
+                  value={status}
+                  onChange={(event) => changeStatus(event.target.value as DirectoryStatus)}
+                  className="flex h-9 w-full min-w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <option value="all">All</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <Button type="button" variant="ghost" onClick={resetFilters} disabled={isLoading}>
+                Clear
+              </Button>
+            </div>
+
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground" role="status">Loading property developments...</p>
+            ) : loadError ? (
+              <div className="space-y-3" role="alert">
+                <p className="text-sm text-destructive">{loadError}</p>
+                <Button type="button" variant="outline" onClick={() => {
+                  setIsLoading(true)
+                  setRevision((value) => value + 1)
+                }}>Try again</Button>
               </div>
             ) : developments.length === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="text-sm font-medium">
-                  No property developments yet
-                </p>
-
+                <p className="text-sm font-medium">No matching property developments</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Master data will appear here after it is added.
+                  Try a different code, name or status filter.
                 </p>
               </div>
             ) : (
@@ -211,37 +225,19 @@ export function PropertyDevelopmentsPage() {
                 <table className="w-full min-w-[520px] text-sm">
                   <thead>
                     <tr className="border-b text-left">
-                      <th className="pb-3 pr-4 font-medium">
-                        Code
-                      </th>
-                      <th className="pb-3 pr-4 font-medium">
-                        Name
-                      </th>
-                      <th className="pb-3 font-medium">
-                        Status
-                      </th>
+                      <th scope="col" className="pb-3 pr-4 font-medium">Code</th>
+                      <th scope="col" className="pb-3 pr-4 font-medium">Name</th>
+                      <th scope="col" className="pb-3 font-medium">Status</th>
                     </tr>
                   </thead>
-
                   <tbody>
                     {developments.map((development) => (
-                      <tr
-                        key={development.id}
-                        className="border-b last:border-0"
-                      >
-                        <td className="py-3 pr-4 font-mono text-xs font-medium">
-                          {development.code}
-                        </td>
-
-                        <td className="py-3 pr-4">
-                          {development.name}
-                        </td>
-
+                      <tr key={development.id} className="border-b last:border-0">
+                        <td className="py-3 pr-4 font-mono text-xs font-medium">{development.code}</td>
+                        <td className="py-3 pr-4">{development.name}</td>
                         <td className="py-3">
                           <span className="inline-flex rounded-full bg-muted px-2 py-1 text-xs font-medium">
-                            {development.is_active
-                              ? 'Active'
-                              : 'Inactive'}
+                            {development.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                       </tr>
@@ -250,6 +246,31 @@ export function PropertyDevelopmentsPage() {
                 </table>
               </div>
             )}
+
+            {!isLoading && !loadError && meta ? (
+              <div className="flex flex-col gap-2 border-t pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-muted-foreground" role="status">
+                  Showing {firstItem}–{lastItem} of {meta.total} developments
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => { setIsLoading(true); setPage((value) => Math.max(1, value - 1)) }}
+                  >Previous</Button>
+                  <span className="text-muted-foreground">Page {meta.current_page} of {meta.last_page}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= meta.last_page}
+                    onClick={() => { setIsLoading(true); setPage((value) => value + 1) }}
+                  >Next</Button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -257,80 +278,40 @@ export function PropertyDevelopmentsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Add Development</CardTitle>
-
-              <CardDescription>
-                Create a new property development.
-              </CardDescription>
+              <CardDescription>Create a new property development.</CardDescription>
             </CardHeader>
-
             <CardContent>
-              <form
-                className="space-y-4"
-                onSubmit={handleSubmit}
-              >
+              <form className="space-y-4" onSubmit={handleSubmit}>
                 <div className="space-y-2">
-                  <Label htmlFor="development-code">
-                    Code
-                  </Label>
-
+                  <Label htmlFor="development-code">Code</Label>
                   <Input
                     id="development-code"
                     name="code"
                     value={code}
-                    onChange={(event) =>
-                      setCode(event.target.value)
-                    }
+                    onChange={(event) => setCode(event.target.value)}
                     placeholder="e.g. GRIYA-01"
                     aria-invalid={Boolean(fieldErrors.code)}
                     disabled={isSubmitting}
                   />
-
-                  {fieldErrors.code ? (
-                    <p className="text-xs text-destructive">
-                      {fieldErrors.code}
-                    </p>
-                  ) : null}
+                  {fieldErrors.code ? <p className="text-xs text-destructive">{fieldErrors.code}</p> : null}
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="development-name">
-                    Name
-                  </Label>
-
+                  <Label htmlFor="development-name">Name</Label>
                   <Input
                     id="development-name"
                     name="name"
                     value={name}
-                    onChange={(event) =>
-                      setName(event.target.value)
-                    }
+                    onChange={(event) => setName(event.target.value)}
                     placeholder="e.g. Griya Residence"
                     aria-invalid={Boolean(fieldErrors.name)}
                     disabled={isSubmitting}
                   />
-
-                  {fieldErrors.name ? (
-                    <p className="text-xs text-destructive">
-                      {fieldErrors.name}
-                    </p>
-                  ) : null}
+                  {fieldErrors.name ? <p className="text-xs text-destructive">{fieldErrors.name}</p> : null}
                 </div>
-
-                {formError ? (
-                  <p className="text-sm text-destructive">
-                    {formError}
-                  </p>
-                ) : null}
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isSubmitting}
-                >
-                  <Plus />
-                  {isSubmitting
-                    ? 'Creating...'
-                    : 'Add Development'}
+                {formError ? <p className="text-sm text-destructive" role="alert">{formError}</p> : null}
+                {formSuccess ? <p className="text-sm" role="status">{formSuccess}</p> : null}
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Plus /> {isSubmitting ? 'Creating...' : 'Add Development'}
                 </Button>
               </form>
             </CardContent>
