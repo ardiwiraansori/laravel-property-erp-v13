@@ -12,6 +12,7 @@ import {
   PlatformOverviewPage,
   PlatformUsersPage,
   PropertyDevelopmentsPage,
+  PropertyDevelopmentDetailPage,
   ReportProblemPage,
 } from '@/app/deferred-pages'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
@@ -70,6 +71,12 @@ export const router = createBrowserRouter([
                 path: 'property-developments',
                 element: <PermissionRoute permission={permissions.propertyDevelopmentsView}>
                   <DeferredPage><PropertyDevelopmentsPage /></DeferredPage>
+                </PermissionRoute>,
+              },
+              {
+                path: 'property-developments/:developmentId',
+                element: <PermissionRoute permission={permissions.propertyDevelopmentsView}>
+                  <DeferredPage><PropertyDevelopmentDetailPage /></DeferredPage>
                 </PermissionRoute>,
               },
             ],

@@ -16,6 +16,7 @@ const routes = [
   ['DashboardPage', 'dashboard-page'],
   ['ReportProblemPage', 'report-problem-page'],
   ['PropertyDevelopmentsPage', 'property-developments-page'],
+  ['PropertyDevelopmentDetailPage', 'property-development-detail-page'],
   ['PlatformOverviewPage', 'platform-overview-page'],
   ['PlatformCompaniesPage', 'platform-companies-page'],
   ['PlatformDiagnosticsPage', 'platform-diagnostics-page'],
@@ -50,9 +51,16 @@ test('Fast Refresh boundaries remain isolated from router instance exports', () 
   assert.doesNotMatch(deferredPages, /export const router\b/)
 })
 
+test('development detail deep link remains nested under tenant view permission', () => {
+  assert.match(router, /path: 'property-developments\/:developmentId'/)
+  assert.match(router, /<DeferredPage><PropertyDevelopmentDetailPage \/><\/DeferredPage>/)
+  assert.match(router, /element: <PermissionRoute permission=\{permissions\.propertyDevelopmentsView\}>/)
+  assert.match(deferredPages, /export const PropertyDevelopmentDetailPage = lazy\(/)
+})
+
 test('entry file and route chunks are separate assets', () => {
   assert.ok(output.some((file) => /^index-.*\.js$/.test(file)), 'Vite entry JS not found')
-  assert.ok(output.length >= routes.length + 1, 'Expected at least seven feature chunks plus entry JS')
+  assert.ok(output.length >= routes.length + 1, 'Expected at least eight feature chunks plus entry JS')
 })
 
 test('lazy route failures are contained with a safe manual recovery action', () => {

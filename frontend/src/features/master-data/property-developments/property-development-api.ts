@@ -8,6 +8,8 @@ export type PropertyDevelopment = {
   created_at: string | null
 }
 
+export type PropertyDevelopmentDetail = PropertyDevelopment & { updated_at: string | null }
+
 export type CreatePropertyDevelopmentInput = {
   code: string
   name: string
@@ -44,6 +46,8 @@ type PropertyDevelopmentDirectoryResponse = PropertyDevelopmentCollectionRespons
   meta: DirectoryMeta
 }
 
+type PropertyDevelopmentDetailResponse = { data: PropertyDevelopmentDetail }
+
 type PropertyDevelopmentResponse = {
   data: PropertyDevelopment
 }
@@ -71,6 +75,14 @@ export async function getPropertyDevelopmentDirectory(query: PropertyDevelopment
   )
 
   return response.data
+}
+
+export async function getPropertyDevelopment(id: number): Promise<PropertyDevelopmentDetail> {
+  const response = await api.get<PropertyDevelopmentDetailResponse>(
+    `/api/master-data/property-developments/${id}`,
+  )
+
+  return response.data.data
 }
 
 export async function createPropertyDevelopment(

@@ -101,6 +101,12 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/summary', [PropertyDevelopmentSummaryController::class, 'show'])
                 ->middleware('can:' . PermissionName::MasterDataPropertyDevelopmentsView->value);
 
+            // Place the fixed /summary path before the numeric detail path.
+            // Both reads require the existing tenant-scoped view permission.
+            Route::get('/{development}', [PropertyDevelopmentController::class, 'show'])
+                ->whereNumber('development')
+                ->middleware('can:' . PermissionName::MasterDataPropertyDevelopmentsView->value);
+
             Route::post('/', [PropertyDevelopmentController::class, 'store'])
                 ->middleware('can:' . PermissionName::MasterDataPropertyDevelopmentsCreate->value);
 

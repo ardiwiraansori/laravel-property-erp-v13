@@ -2,6 +2,7 @@ import axios from 'axios'
 import { Plus, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -296,7 +297,12 @@ export function PropertyDevelopmentsPage() {
                     {developments.map((development) => (
                       <tr key={development.id} className="border-b last:border-0">
                         <td className="py-3 pr-4 font-mono text-xs font-medium">{development.code}</td>
-                        <td className="py-3 pr-4">{development.name}</td>
+                        <td className="py-3 pr-4">
+                          <Link to={`/master-data/property-developments/${development.id}`}
+                            className="font-medium text-primary underline-offset-4 hover:underline focus-visible:underline">
+                            {development.name}
+                          </Link>
+                        </td>
                         <td className="py-3">
                           <span className="inline-flex rounded-full bg-muted px-2 py-1 text-xs font-medium">
                             {development.is_active ? 'Active' : 'Inactive'}

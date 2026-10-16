@@ -15,6 +15,8 @@ export const ReportProblemPage = lazy(() => import('@/features/diagnostics/repor
   .then((module) => ({ default: module.ReportProblemPage })))
 export const PropertyDevelopmentsPage = lazy(() => import('@/features/master-data/property-developments/property-developments-page')
   .then((module) => ({ default: module.PropertyDevelopmentsPage })))
+export const PropertyDevelopmentDetailPage = lazy(() => import('@/features/master-data/property-developments/property-development-detail-page')
+  .then((module) => ({ default: module.PropertyDevelopmentDetailPage })))
 export const PlatformOverviewPage = lazy(() => import('@/features/platform/platform-overview-page')
   .then((module) => ({ default: module.PlatformOverviewPage })))
 export const PlatformCompaniesPage = lazy(() => import('@/features/platform/platform-companies-page')

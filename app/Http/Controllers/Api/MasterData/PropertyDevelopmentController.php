@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\MasterData;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\MasterData\StorePropertyDevelopmentRequest;
 use App\Http\Requests\MasterData\UpdatePropertyDevelopmentRequest;
+use App\Http\Resources\MasterData\PropertyDevelopmentDetailResource;
 use App\Http\Resources\MasterData\PropertyDevelopmentResource;
 use App\Models\PropertyDevelopment;
 use App\Support\Tenancy\CurrentCompanyContext;
@@ -66,6 +67,17 @@ class PropertyDevelopmentController extends Controller
                 'total' => $page->total(),
             ],
         ]);
+    }
+
+    /** A record lookup must always be constrained by the server-resolved tenant. */
+    public function show(CurrentCompanyContext $context, int $development): JsonResponse
+    {
+        $record = PropertyDevelopment::query()
+            ->where('company_id', $context->id())
+            ->whereKey($development)
+            ->firstOrFail();
+
+        return PropertyDevelopmentDetailResource::make($record)->response();
     }
 
     public function store(
