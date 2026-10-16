@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyContextController;
 use App\Http\Controllers\Api\Diagnostics\DiagnosticReportController;
 use App\Http\Controllers\Api\MasterData\PropertyDevelopmentController;
+use App\Http\Controllers\Api\MasterData\PropertyDevelopmentSummaryController;
 use App\Http\Controllers\Api\Platform\PlatformCapabilityController;
 use App\Http\Controllers\Api\Platform\PlatformCompanyController;
 use App\Http\Controllers\Api\Platform\PlatformCompanyManagementController;
@@ -94,6 +95,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('company')
         ->group(function () {
             Route::get('/', [PropertyDevelopmentController::class, 'index'])
+                ->middleware('can:' . PermissionName::MasterDataPropertyDevelopmentsView->value);
+
+            // Aggregated counts for the resolved active company only; uses the existing view permission.
+            Route::get('/summary', [PropertyDevelopmentSummaryController::class, 'show'])
                 ->middleware('can:' . PermissionName::MasterDataPropertyDevelopmentsView->value);
 
             Route::post('/', [PropertyDevelopmentController::class, 'store'])

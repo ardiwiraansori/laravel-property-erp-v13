@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 
 import { ApiHealthStatus } from '@/components/dashboard/api-health-status'
+import { PropertyDevelopmentSummaryCard } from '@/components/dashboard/property-development-summary-card'
 import {
   Card,
   CardContent,
@@ -16,9 +17,12 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { useAuth } from '@/features/auth/auth-state'
+import { hasPermission, permissions } from '@/features/auth/permissions'
+import { useCompany } from '@/features/company/company-state'
 
 export function DashboardPage() {
   const { user } = useAuth()
+  const { activeCompany } = useCompany()
 
   if (!user) {
     return null
@@ -73,6 +77,15 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {activeCompany && hasPermission(activeCompany.permissions, permissions.propertyDevelopmentsView) ? (
+        <PropertyDevelopmentSummaryCard
+          key={activeCompany.id}
+          companyId={activeCompany.id}
+          companyName={activeCompany.name}
+          canOpenDirectory={hasPermission(activeCompany.permissions, permissions.masterDataView)}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>
