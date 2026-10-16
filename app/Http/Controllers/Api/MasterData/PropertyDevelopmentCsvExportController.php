@@ -20,6 +20,7 @@ final class PropertyDevelopmentCsvExportController extends Controller
         $params = $request->validate([
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
             'status' => ['sometimes', Rule::in(['all', 'active', 'inactive'])],
+            'sort' => ['sometimes', Rule::in(PropertyDevelopmentDirectoryFilter::SORTS)],
             // Export covers all matching rows, never one arbitrary pagination window.
             'page' => ['prohibited'],
             'per_page' => ['prohibited'],
@@ -29,7 +30,7 @@ final class PropertyDevelopmentCsvExportController extends Controller
             PropertyDevelopment::query()->where('company_id', $context->id()),
             $params,
         );
-        $rows = $query->orderBy('name')->orderBy('id')
+        $rows = PropertyDevelopmentDirectoryFilter::order($query, $params['sort'] ?? 'name_asc')
             ->limit(self::MAX_ROWS + 1)
             ->get(['code', 'name', 'is_active', 'created_at']);
 

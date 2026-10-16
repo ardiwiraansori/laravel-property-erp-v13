@@ -26,6 +26,7 @@ class PropertyDevelopmentController extends Controller
             'status' => ['sometimes', Rule::in(['all', 'active', 'inactive'])],
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'sort' => ['sometimes', Rule::in(PropertyDevelopmentDirectoryFilter::SORTS)],
         ]);
 
         // Retain the original unpaginated GET contract for existing integrations.
@@ -33,7 +34,7 @@ class PropertyDevelopmentController extends Controller
         $developments = PropertyDevelopment::query()
             ->where('company_id', $context->id());
 
-        if (! $request->hasAny(['search', 'status', 'page', 'per_page'])) {
+        if (! $request->hasAny(['search', 'status', 'page', 'per_page', 'sort'])) {
             return PropertyDevelopmentResource::collection(
                 $developments->orderBy('name')->orderBy('id')->get()
             );
@@ -41,7 +42,7 @@ class PropertyDevelopmentController extends Controller
 
         PropertyDevelopmentDirectoryFilter::apply($developments, $params);
 
-        $page = $developments->orderBy('name')->orderBy('id')
+        $page = PropertyDevelopmentDirectoryFilter::order($developments, $params['sort'] ?? 'name_asc')
             ->paginate((int) ($params['per_page'] ?? 10), ['*'], 'page', (int) ($params['page'] ?? 1));
 
         return response()->json([

@@ -1,4 +1,4 @@
-import type { DirectoryStatus } from '@/features/master-data/property-developments/property-development-api'
+import type { DirectorySort, DirectoryStatus } from '@/features/master-data/property-developments/property-development-api'
 
 // URL state is purely navigational; server-side tenant and permissions are
 // always resolved from the authenticated company context, never from URL data.
@@ -9,6 +9,7 @@ export type DirectoryUrlState = {
   status: DirectoryStatus
   page: number
   perPage: DirectoryPageSize
+  sort: DirectorySort
 }
 
 export const DEFAULT_DIRECTORY_STATE: Readonly<DirectoryUrlState> = {
@@ -16,6 +17,7 @@ export const DEFAULT_DIRECTORY_STATE: Readonly<DirectoryUrlState> = {
   status: 'all',
   page: 1,
   perPage: 10,
+  sort: 'name_asc',
 }
 
 // Explicit bounds prevent oversized/unexpected query input from reaching the
@@ -32,7 +34,11 @@ export function readDirectoryUrlState(params: URLSearchParams): DirectoryUrlStat
   const rawPageSize = params.get('per_page')
   const perPage: DirectoryPageSize = rawPageSize === '25' ? 25 : rawPageSize === '50' ? 50 : 10
 
-  return { search, status, page, perPage }
+  const rawSort = params.get('sort')
+  const sort: DirectorySort = rawSort === 'name_desc' || rawSort === 'code_asc' || rawSort === 'code_desc'
+    || rawSort === 'created_desc' || rawSort === 'created_asc' ? rawSort : 'name_asc'
+
+  return { search, status, page, perPage, sort }
 }
 
 export function directoryUrlParams(state: DirectoryUrlState): URLSearchParams {
@@ -44,6 +50,8 @@ export function directoryUrlParams(state: DirectoryUrlState): URLSearchParams {
     params.set('page', String(state.page))
   }
   if (state.perPage === 25 || state.perPage === 50) params.set('per_page', String(state.perPage))
+  if (state.sort === 'name_desc' || state.sort === 'code_asc' || state.sort === 'code_desc'
+    || state.sort === 'created_desc' || state.sort === 'created_asc') params.set('sort', state.sort)
   return params
 }
 
