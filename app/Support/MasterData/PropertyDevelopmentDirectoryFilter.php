@@ -46,6 +46,15 @@ final class PropertyDevelopmentDirectoryFilter
             $query->where('is_active', $params['status'] === 'active');
         }
 
+        // Database timestamps are stored in UTC. Compare calendar dates inclusively.
+        // Values have already been validated (YYYY-MM-DD, ordered bounds) by both APIs.
+        if (isset($params['created_from'])) {
+            $query->whereDate('created_at', '>=', $params['created_from']);
+        }
+        if (isset($params['created_to'])) {
+            $query->whereDate('created_at', '<=', $params['created_to']);
+        }
+
         return $query;
     }
 }

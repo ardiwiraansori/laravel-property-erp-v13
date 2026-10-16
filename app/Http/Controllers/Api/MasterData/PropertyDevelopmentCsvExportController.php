@@ -21,6 +21,8 @@ final class PropertyDevelopmentCsvExportController extends Controller
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
             'status' => ['sometimes', Rule::in(['all', 'active', 'inactive'])],
             'sort' => ['sometimes', Rule::in(PropertyDevelopmentDirectoryFilter::SORTS)],
+            'created_from' => ['sometimes', 'date_format:Y-m-d'],
+            'created_to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:created_from'],
             // Export covers all matching rows, never one arbitrary pagination window.
             'page' => ['prohibited'],
             'per_page' => ['prohibited'],

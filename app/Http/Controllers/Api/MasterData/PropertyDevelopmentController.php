@@ -27,6 +27,8 @@ class PropertyDevelopmentController extends Controller
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'sort' => ['sometimes', Rule::in(PropertyDevelopmentDirectoryFilter::SORTS)],
+            'created_from' => ['sometimes', 'date_format:Y-m-d'],
+            'created_to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:created_from'],
         ]);
 
         // Retain the original unpaginated GET contract for existing integrations.
@@ -34,7 +36,7 @@ class PropertyDevelopmentController extends Controller
         $developments = PropertyDevelopment::query()
             ->where('company_id', $context->id());
 
-        if (! $request->hasAny(['search', 'status', 'page', 'per_page', 'sort'])) {
+        if (! $request->hasAny(['search', 'status', 'page', 'per_page', 'sort', 'created_from', 'created_to'])) {
             return PropertyDevelopmentResource::collection(
                 $developments->orderBy('name')->orderBy('id')->get()
             );
