@@ -1,5 +1,8 @@
 import { lazy, Suspense } from 'react'
 import type { ReactNode } from 'react'
+import { useLocation } from 'react-router'
+
+import { LazyRouteErrorBoundary } from '@/app/lazy-route-error-boundary'
 
 // This module exports React components only. Keep lazy page definitions apart
 // from router.tsx, which exports a non-component Router instance. This avoids
@@ -22,9 +25,15 @@ export const PlatformUsersPage = lazy(() => import('@/features/platform/platform
   .then((module) => ({ default: module.PlatformUsersPage })))
 
 export function DeferredPage({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+
+  // Navigating to a different route resets a failed page without ever
+  // bypassing its route-level authorization or attempting an automatic reload.
   return (
-    <Suspense fallback={<p role="status" className="p-4 text-sm text-muted-foreground">Loading page...</p>}>
-      {children}
-    </Suspense>
+    <LazyRouteErrorBoundary key={pathname}>
+      <Suspense fallback={<p role="status" className="p-4 text-sm text-muted-foreground">Loading page...</p>}>
+        {children}
+      </Suspense>
+    </LazyRouteErrorBoundary>
   )
 }

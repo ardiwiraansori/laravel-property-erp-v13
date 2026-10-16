@@ -7,6 +7,7 @@ import test from 'node:test'
 const frontendRoot = fileURLToPath(new URL('../', import.meta.url))
 const router = readFileSync(path.join(frontendRoot, 'src/app/router.tsx'), 'utf8')
 const deferredPages = readFileSync(path.join(frontendRoot, 'src/app/deferred-pages.tsx'), 'utf8')
+const routeErrorBoundary = readFileSync(path.join(frontendRoot, 'src/app/lazy-route-error-boundary.tsx'), 'utf8')
 const assetsDirectory = path.join(frontendRoot, 'dist/assets')
 
 // These tests inspect actual Vite output, not an assumed bundle-size reduction.
@@ -52,4 +53,18 @@ test('Fast Refresh boundaries remain isolated from router instance exports', () 
 test('entry file and route chunks are separate assets', () => {
   assert.ok(output.some((file) => /^index-.*\.js$/.test(file)), 'Vite entry JS not found')
   assert.ok(output.length >= routes.length + 1, 'Expected at least seven feature chunks plus entry JS')
+})
+
+test('lazy route failures are contained with a safe manual recovery action', () => {
+  assert.match(deferredPages, /<LazyRouteErrorBoundary key=\{pathname\}>/)
+  assert.match(routeErrorBoundary, /static getDerivedStateFromError\(\)/)
+  assert.match(routeErrorBoundary, /role="alert"/)
+  assert.match(routeErrorBoundary, /onClick=\{\(\) => window\.location\.reload\(\)\}/)
+  assert.doesNotMatch(routeErrorBoundary, /console\.|componentDidCatch|\berror\.message\b/)
+})
+
+test('existing suspense fallback is nested inside the route failure boundary', () => {
+  assert.match(deferredPages, /<LazyRouteErrorBoundary key=\{pathname\}>\s*<Suspense fallback=/)
+  assert.match(deferredPages, /useLocation\(\)/)
+  assert.match(deferredPages, /<\/Suspense>\s*<\/LazyRouteErrorBoundary>/)
 })
