@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { hasPermission, permissions } from '@/features/auth/permissions'
 import { useCompany } from '@/features/company/company-state'
+import { createdDatePresetRange, displayCreatedDateUtc } from '@/features/master-data/property-developments/directory-date-presets'
+import type { CreatedDatePreset } from '@/features/master-data/property-developments/directory-date-presets'
 import { directoryUrlParams, directoryUrlSearch, isValidDirectoryDate, readDirectoryUrlState } from '@/features/master-data/property-developments/directory-url'
 import type { DirectoryPageSize } from '@/features/master-data/property-developments/directory-url'
 import {
@@ -253,6 +255,20 @@ export function PropertyDevelopmentsPage() {
     setUrlParams(directoryUrlParams({ search, status, page: 1, perPage, sort, createdFrom: from, createdTo: to }))
   }
 
+  function changeDatePreset(preset: CreatedDatePreset) {
+    // Unlike the manual date inputs, selecting a quick range applies it now.
+    // This keeps the URL as the source of truth for pagination and CSV export.
+    const range = createdDatePresetRange(preset)
+    setDateError(null)
+    setEditing(null)
+    setEditError(null)
+    setIsLoading(true)
+    setDraftDates({ applied: JSON.stringify([range.createdFrom, range.createdTo]), from: range.createdFrom, to: range.createdTo })
+    setUrlParams(directoryUrlParams({ search, status, page: 1, perPage, sort, ...range }))
+    // Re-selecting an already-applied range still refreshes the result.
+    setRevision((value) => value + 1)
+  }
+
   function resetFilters() {
     setEditing(null)
     setEditError(null)
@@ -388,7 +404,22 @@ export function PropertyDevelopmentsPage() {
                   }} />
               </div>
               <Button type="submit" variant="outline" disabled={showingLoading}>Apply dates</Button>
-              <p className="text-xs text-muted-foreground">Inclusive UTC calendar dates; leave either field blank for an open-ended range.</p>
+              <div className="space-y-1">
+                <Label htmlFor="development-date-preset">Quick dates (UTC)</Label>
+                <select id="development-date-preset" aria-label="Quick dates (UTC)"
+                  value="" disabled={showingLoading}
+                  onChange={(event) => {
+                    if (event.target.value) changeDatePreset(event.target.value as CreatedDatePreset)
+                  }}
+                  className="flex h-9 min-w-36 rounded-md border border-input bg-transparent px-2 text-sm">
+                  <option value="" disabled>Select a range</option>
+                  <option value="today">Today (UTC)</option>
+                  <option value="last_7_days">Last 7 days (UTC)</option>
+                  <option value="this_month">This month (UTC)</option>
+                  <option value="clear">Clear dates</option>
+                </select>
+              </div>
+              <p className="text-xs text-muted-foreground">Inclusive UTC dates. Quick ranges apply immediately; manual dates use Apply dates.</p>
             </form>
             {dateError ? <p role="alert" className="text-sm text-destructive">{dateError}</p> : null}
             <p className="text-xs text-muted-foreground">CSV exports all matching records (up to 1,000), not only the current page.</p>
@@ -413,12 +444,13 @@ export function PropertyDevelopmentsPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-sm">
+                <table className="w-full min-w-[650px] text-sm">
                   <thead>
                     <tr className="border-b text-left">
                       <th scope="col" className="pb-3 pr-4 font-medium">Code</th>
                       <th scope="col" className="pb-3 pr-4 font-medium">Name</th>
-                      <th scope="col" className="pb-3 font-medium">Status</th>
+                      <th scope="col" className="pb-3 pr-4 font-medium">Status</th>
+                      <th scope="col" className="pb-3 font-medium">Created (UTC)</th>
                       {canUpdate ? <th scope="col" className="pb-3 pl-3 font-medium">Actions</th> : null}
                     </tr>
                   </thead>
@@ -432,10 +464,13 @@ export function PropertyDevelopmentsPage() {
                             {development.name}
                           </Link>
                         </td>
-                        <td className="py-3">
+                        <td className="py-3 pr-4">
                           <span className="inline-flex rounded-full bg-muted px-2 py-1 text-xs font-medium">
                             {development.is_active ? 'Active' : 'Inactive'}
                           </span>
+                        </td>
+                        <td className="py-3 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                          {displayCreatedDateUtc(development.created_at)}
                         </td>
                         {canUpdate ? (
                           <td className="py-3 pl-3">

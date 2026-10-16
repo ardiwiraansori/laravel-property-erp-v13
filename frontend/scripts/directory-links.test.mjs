@@ -240,3 +240,73 @@ test('date API keys are allowlisted and exported without page or tenant identifi
   const detail = file('src/features/master-data/property-developments/property-development-detail-page.tsx')
   assert.match(detail, /directoryUrlSearch\(readDirectoryUrlState\(new URLSearchParams\(location.search\)\)\)/)
 })
+
+// These are runtime assertions of the same pure TypeScript date utilities used
+// by the React directory, not a reimplementation of their date arithmetic.
+const presetsSource = file('src/features/master-data/property-developments/directory-date-presets.ts')
+const presetsCompiled = ts.transpileModule(presetsSource, {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  reportDiagnostics: true,
+})
+assert.deepEqual(presetsCompiled.diagnostics?.filter((d) => d.category === ts.DiagnosticCategory.Error) ?? [], [])
+const { createdDatePresetRange, displayCreatedDateUtc } = await import(
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(presetsCompiled.outputText)}`
+)
+
+test('today quick range respects the UTC calendar day, not the user timezone', () => {
+  assert.deepEqual(createdDatePresetRange('today', new Date('2026-01-01T00:30:00+07:00')),
+    { createdFrom: '2025-12-31', createdTo: '2025-12-31' })
+  assert.deepEqual(createdDatePresetRange('today', new Date('2026-10-16T23:59:59Z')),
+    { createdFrom: '2026-10-16', createdTo: '2026-10-16' })
+})
+
+test('last seven days include today and handle month year and leap transitions', () => {
+  assert.deepEqual(createdDatePresetRange('last_7_days', new Date('2026-01-03T12:00:00Z')),
+    { createdFrom: '2025-12-28', createdTo: '2026-01-03' })
+  assert.deepEqual(createdDatePresetRange('last_7_days', new Date('2024-03-01T00:00:00Z')),
+    { createdFrom: '2024-02-24', createdTo: '2024-03-01' })
+})
+
+test('this month uses UTC first-of-month through current UTC date', () => {
+  assert.deepEqual(createdDatePresetRange('this_month', new Date('2026-03-31T23:59:59Z')),
+    { createdFrom: '2026-03-01', createdTo: '2026-03-31' })
+  assert.deepEqual(createdDatePresetRange('this_month', new Date('2026-02-01T00:15:00+07:00')),
+    { createdFrom: '2026-01-01', createdTo: '2026-01-31' })
+})
+
+test('clear dates removes only the date restriction and invalid preset is rejected', () => {
+  assert.deepEqual(createdDatePresetRange('clear'), { createdFrom: '', createdTo: '' })
+  assert.throws(() => createdDatePresetRange('arbitrary', new Date('2026-01-01Z')), /Unsupported/)
+  assert.throws(() => createdDatePresetRange('today', new Date('invalid')), /Invalid/)
+})
+
+test('created date display is UTC-stable even when an ISO timestamp has an offset', () => {
+  assert.equal(displayCreatedDateUtc('2026-03-01T00:15:00+07:00'), '2026-02-28')
+  assert.equal(displayCreatedDateUtc('2026-02-28T23:59:59.999Z'), '2026-02-28')
+  assert.equal(displayCreatedDateUtc('2026-02-28T18:00:00-07:00'), '2026-03-01')
+  assert.equal(displayCreatedDateUtc(null), '—')
+  assert.equal(displayCreatedDateUtc('not-a-date'), '—')
+})
+
+test('quick date control applies filtered URL while preserving sort tenant context and CSV contract', () => {
+  const directory = file('src/features/master-data/property-developments/property-developments-page.tsx')
+  assert.match(directory, /function changeDatePreset\(preset: CreatedDatePreset\)/)
+  assert.match(directory, /const range = createdDatePresetRange\(preset\)/)
+  assert.match(directory, /page: 1, perPage, sort, \.\.\.range/)
+  assert.match(directory, /setRevision\(\(value\) => value \+ 1\)/)
+  assert.match(directory, /id="development-date-preset"/)
+  for (const option of ['today', 'last_7_days', 'this_month', 'clear']) {
+    assert.ok(directory.includes(`<option value="${option}">`))
+  }
+  assert.match(directory, /Created \(UTC\)/)
+  assert.match(directory, /displayCreatedDateUtc\(development\.created_at\)/)
+  assert.match(directory, /exportPropertyDevelopmentsCsv\(\{ search, status, sort, createdFrom, createdTo \}\)/)
+  assert.doesNotMatch(directory, /company_id=/)
+  assert.deepEqual(readDirectoryUrlState(directoryUrlParams({
+    search: 'Villa', status: 'active', page: 1, perPage: 25, sort: 'created_desc',
+    ...createdDatePresetRange('last_7_days', new Date('2026-10-16T04:00:00Z')),
+  })), {
+    search: 'Villa', status: 'active', page: 1, perPage: 25, sort: 'created_desc',
+    createdFrom: '2026-10-10', createdTo: '2026-10-16',
+  })
+})
