@@ -13,6 +13,13 @@ export type CreatePropertyDevelopmentInput = {
   name: string
 }
 
+export type UpdatePropertyDevelopmentInput = {
+  name: string
+  is_active: boolean
+  expected_name: string
+  expected_is_active: boolean
+}
+
 export type DirectoryStatus = 'all' | 'active' | 'inactive'
 
 export type PropertyDevelopmentDirectoryQuery = {
@@ -71,6 +78,18 @@ export async function createPropertyDevelopment(
 ) {
   const response = await api.post<PropertyDevelopmentResponse>(
     '/api/master-data/property-developments',
+    input,
+  )
+
+  return response.data.data
+}
+
+export async function updatePropertyDevelopment(
+  id: number,
+  input: UpdatePropertyDevelopmentInput,
+) {
+  const response = await api.patch<PropertyDevelopmentResponse>(
+    `/api/master-data/property-developments/${id}`,
     input,
   )
 

@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\Platform\PlatformMfaController;
 use App\Http\Controllers\Api\Platform\PlatformUserController;
 use App\Http\Controllers\Api\Platform\PlatformUserManagementController;
 use App\Http\Resources\AuthUserResource;
+use App\Support\MasterData\PropertyDevelopmentAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -97,5 +98,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::post('/', [PropertyDevelopmentController::class, 'store'])
                 ->middleware('can:' . PermissionName::MasterDataPropertyDevelopmentsCreate->value);
+
+            Route::patch('/{development}', [PropertyDevelopmentController::class, 'update'])
+                ->whereNumber('development')
+                ->middleware('can:' . PropertyDevelopmentAccess::UPDATE);
         });
 });

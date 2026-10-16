@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api\MasterData;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\MasterData\StorePropertyDevelopmentRequest;
+use App\Http\Requests\MasterData\UpdatePropertyDevelopmentRequest;
 use App\Http\Resources\MasterData\PropertyDevelopmentResource;
 use App\Models\PropertyDevelopment;
 use App\Support\Tenancy\CurrentCompanyContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
@@ -79,4 +81,39 @@ class PropertyDevelopmentController extends Controller
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
     }
+    /** Company-resolved update; never accepts a caller-selected tenant or mutable code. */
+    public function update(
+        UpdatePropertyDevelopmentRequest $request,
+        CurrentCompanyContext $context,
+        int $development,
+    ): JsonResponse {
+        $data = $request->validated();
+
+        $updated = DB::transaction(function () use ($context, $development, $data): PropertyDevelopment {
+            $model = PropertyDevelopment::query()
+                ->where('company_id', $context->id())
+                ->whereKey($development)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Snapshot CAS: protects against another editor changing name or status.
+            // Neither id, company_id nor code can be updated via this endpoint.
+            if ($model->name !== $data['expected_name'] ||
+                $model->is_active !== (bool) $data['expected_is_active']) {
+                abort(409, 'The development changed. Reload the directory before editing again.');
+            }
+
+            if ($model->name !== $data['name'] || $model->is_active !== (bool) $data['is_active']) {
+                $model->update([
+                    'name' => $data['name'],
+                    'is_active' => (bool) $data['is_active'],
+                ]);
+            }
+
+            return $model->refresh();
+        });
+
+        return PropertyDevelopmentResource::make($updated)->response();
+    }
+
 }

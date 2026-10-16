@@ -18,6 +18,7 @@ import { useCompany } from '@/features/company/company-state'
 import {
   createPropertyDevelopment,
   getPropertyDevelopmentDirectory,
+  updatePropertyDevelopment,
   type DirectoryMeta,
   type DirectoryStatus,
   type PropertyDevelopment,
@@ -60,12 +61,23 @@ export function PropertyDevelopmentsPage() {
   const [formSuccess, setFormSuccess] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const [editing, setEditing] = useState<PropertyDevelopment | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editActive, setEditActive] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editSuccess, setEditSuccess] = useState<string | null>(null)
+
   const canCreate =
     activeCompany !== null &&
     hasPermission(
       activeCompany.permissions,
       permissions.propertyDevelopmentsCreate,
     )
+
+  const canUpdate =
+    activeCompany !== null &&
+    hasPermission(activeCompany.permissions, permissions.propertyDevelopmentsUpdate)
 
   useEffect(() => {
     let current = true
@@ -94,8 +106,53 @@ export function PropertyDevelopmentsPage() {
     }
   }, [companyId, page, revision, search, status])
 
+  function beginEdit(development: PropertyDevelopment) {
+    if (!canUpdate || isUpdating) return
+    setEditing(development)
+    setEditName(development.name)
+    setEditActive(development.is_active)
+    setEditError(null)
+    setEditSuccess(null)
+  }
+
+  async function saveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editing || !canUpdate || isUpdating) return
+    setIsUpdating(true)
+    setEditError(null)
+    setEditSuccess(null)
+
+    try {
+      await updatePropertyDevelopment(editing.id, {
+        name: editName,
+        is_active: editActive,
+        expected_name: editing.name,
+        expected_is_active: editing.is_active,
+      })
+      setEditing(null)
+      setEditSuccess('Development updated successfully.')
+      setIsLoading(true)
+      setRevision((value) => value + 1)
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        setEditing(null)
+        setEditError('This development was changed by another user. Directory refreshed; please review and edit again.')
+        setIsLoading(true)
+        setRevision((value) => value + 1)
+      } else if (axios.isAxiosError(error) && error.response?.status === 422) {
+        setEditError('Please provide a valid name (1–150 characters) and status.')
+      } else {
+        setEditError('Unable to update the development. Please try again.')
+      }
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setEditing(null)
+    setEditError(null)
     setIsLoading(true)
     setPage(1)
     setSearch(searchInput.trim())
@@ -103,12 +160,16 @@ export function PropertyDevelopmentsPage() {
   }
 
   function changeStatus(value: DirectoryStatus) {
+    setEditing(null)
+    setEditError(null)
     setIsLoading(true)
     setPage(1)
     setStatus(value)
   }
 
   function resetFilters() {
+    setEditing(null)
+    setEditError(null)
     setIsLoading(true)
     setSearchInput('')
     setSearch('')
@@ -228,6 +289,7 @@ export function PropertyDevelopmentsPage() {
                       <th scope="col" className="pb-3 pr-4 font-medium">Code</th>
                       <th scope="col" className="pb-3 pr-4 font-medium">Name</th>
                       <th scope="col" className="pb-3 font-medium">Status</th>
+                      {canUpdate ? <th scope="col" className="pb-3 pl-3 font-medium">Actions</th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -240,12 +302,59 @@ export function PropertyDevelopmentsPage() {
                             {development.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
+                        {canUpdate ? (
+                          <td className="py-3 pl-3">
+                            <Button type="button" size="sm" variant="outline"
+                              disabled={isUpdating} onClick={() => beginEdit(development)}
+                              aria-label={`Edit ${development.code}`}>
+                              Edit
+                            </Button>
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
+
+            {editError ? <p role="alert" className="text-sm text-destructive">{editError}</p> : null}
+            {editSuccess ? <p role="status" className="text-sm">{editSuccess}</p> : null}
+
+            {canUpdate && editing ? (
+              <form onSubmit={(event) => void saveEdit(event)}
+                className="space-y-3 rounded-lg border p-4" aria-label={`Edit ${editing.code}`}>
+                <div>
+                  <p className="text-sm font-semibold">Edit {editing.code}</p>
+                  <p className="text-xs text-muted-foreground">The development code and company cannot be changed.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-development-name">Name</Label>
+                  <Input id="edit-development-name" value={editName} maxLength={150}
+                    onChange={(event) => setEditName(event.target.value)} disabled={isUpdating} required />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-development-status">Status</Label>
+                  <select id="edit-development-status" value={editActive ? 'active' : 'inactive'}
+                    onChange={(event) => setEditActive(event.target.value === 'active')}
+                    disabled={isUpdating}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  {!editActive ? (
+                    <p className="text-xs text-muted-foreground">Inactive developments remain stored and visible when using the All or Inactive filter.</p>
+                  ) : null}
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={isUpdating || !editName.trim()}>
+                    {isUpdating ? 'Saving...' : 'Save changes'}
+                  </Button>
+                  <Button type="button" variant="outline" disabled={isUpdating}
+                    onClick={() => { setEditing(null); setEditError(null) }}>Cancel</Button>
+                </div>
+              </form>
+            ) : null}
 
             {!isLoading && !loadError && meta ? (
               <div className="flex flex-col gap-2 border-t pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -258,7 +367,7 @@ export function PropertyDevelopmentsPage() {
                     variant="outline"
                     size="sm"
                     disabled={page <= 1}
-                    onClick={() => { setIsLoading(true); setPage((value) => Math.max(1, value - 1)) }}
+                    onClick={() => { setEditing(null); setIsLoading(true); setPage((value) => Math.max(1, value - 1)) }}
                   >Previous</Button>
                   <span className="text-muted-foreground">Page {meta.current_page} of {meta.last_page}</span>
                   <Button
@@ -266,7 +375,7 @@ export function PropertyDevelopmentsPage() {
                     variant="outline"
                     size="sm"
                     disabled={page >= meta.last_page}
-                    onClick={() => { setIsLoading(true); setPage((value) => value + 1) }}
+                    onClick={() => { setEditing(null); setIsLoading(true); setPage((value) => value + 1) }}
                   >Next</Button>
                 </div>
               </div>

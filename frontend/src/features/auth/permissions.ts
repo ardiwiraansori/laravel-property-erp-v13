@@ -6,6 +6,8 @@ export const permissions = {
     'master-data.property-developments.view',
   propertyDevelopmentsCreate:
     'master-data.property-developments.create',
+  propertyDevelopmentsUpdate:
+    'master-data.property-developments.update',
 
   crmView: 'crm.view',
   salesView: 'sales.view',
