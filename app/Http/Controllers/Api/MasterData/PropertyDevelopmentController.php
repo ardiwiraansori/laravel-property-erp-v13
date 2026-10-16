@@ -8,8 +8,8 @@ use App\Http\Requests\MasterData\UpdatePropertyDevelopmentRequest;
 use App\Http\Resources\MasterData\PropertyDevelopmentDetailResource;
 use App\Http\Resources\MasterData\PropertyDevelopmentResource;
 use App\Models\PropertyDevelopment;
+use App\Support\MasterData\PropertyDevelopmentDirectoryFilter;
 use App\Support\Tenancy\CurrentCompanyContext;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -39,21 +39,7 @@ class PropertyDevelopmentController extends Controller
             );
         }
 
-        $search = trim((string) ($params['search'] ?? ''));
-        if ($search !== '') {
-            // Match input literally: SQL wildcard symbols must not broaden the search.
-            // ESCAPE '!' is supported by SQLite (tests) and MariaDB (development).
-            $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($search));
-            $pattern = '%'.$escaped.'%';
-            $developments->where(static function (Builder $query) use ($pattern): void {
-                $query->whereRaw("LOWER(code) LIKE ? ESCAPE '!'", [$pattern])
-                    ->orWhereRaw("LOWER(name) LIKE ? ESCAPE '!'", [$pattern]);
-            });
-        }
-
-        if (($params['status'] ?? 'all') !== 'all') {
-            $developments->where('is_active', $params['status'] === 'active');
-        }
+        PropertyDevelopmentDirectoryFilter::apply($developments, $params);
 
         $page = $developments->orderBy('name')->orderBy('id')
             ->paginate((int) ($params['per_page'] ?? 10), ['*'], 'page', (int) ($params['page'] ?? 1));

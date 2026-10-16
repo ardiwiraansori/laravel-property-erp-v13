@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { Plus, Search } from 'lucide-react'
+import { Download, Plus, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router'
@@ -18,6 +18,7 @@ import { hasPermission, permissions } from '@/features/auth/permissions'
 import { useCompany } from '@/features/company/company-state'
 import {
   createPropertyDevelopment,
+  exportPropertyDevelopmentsCsv,
   getPropertyDevelopmentDirectory,
   updatePropertyDevelopment,
   type DirectoryMeta,
@@ -49,6 +50,8 @@ export function PropertyDevelopmentsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -147,6 +150,35 @@ export function PropertyDevelopmentsPage() {
       }
     } finally {
       setIsUpdating(false)
+    }
+  }
+
+  async function handleExport() {
+    if (isExporting || isLoading || !activeCompany) return
+    setIsExporting(true)
+    setExportError(null)
+    try {
+      // The server exports the entire filtered result (up to 1,000), not just this page.
+      const csv = await exportPropertyDevelopmentsCsv({ search, status })
+      const url = URL.createObjectURL(csv)
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'property-developments.csv'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 422) {
+        setExportError('Too many matching records (maximum 1,000), or invalid filters. Narrow your search and retry.')
+      } else {
+        setExportError('Unable to export property developments. Please try again.')
+      }
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -263,7 +295,13 @@ export function PropertyDevelopmentsPage() {
               <Button type="button" variant="ghost" onClick={resetFilters} disabled={isLoading}>
                 Clear
               </Button>
+              <Button type="button" variant="outline" disabled={isLoading || isExporting}
+                onClick={() => void handleExport()}>
+                <Download /> {isExporting ? 'Exporting...' : 'Export CSV'}
+              </Button>
             </div>
+            <p className="text-xs text-muted-foreground">CSV exports all matching records (up to 1,000), not only the current page.</p>
+            {exportError ? <p className="text-sm text-destructive" role="alert">{exportError}</p> : null}
 
             {isLoading ? (
               <p className="text-sm text-muted-foreground" role="status">Loading property developments...</p>

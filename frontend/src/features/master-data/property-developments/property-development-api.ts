@@ -107,3 +107,22 @@ export async function updatePropertyDevelopment(
 
   return response.data.data
 }
+
+// Download uses the existing tenant-aware Axios instance and active directory filters.
+// It returns a Blob; browser download is initiated only by an explicit user click.
+export async function exportPropertyDevelopmentsCsv(
+  filters: Pick<PropertyDevelopmentDirectoryQuery, 'search' | 'status'>,
+): Promise<Blob> {
+  const response = await api.get<Blob>(
+    '/api/master-data/property-developments/export',
+    {
+      params: {
+        search: filters.search || undefined,
+        status: filters.status,
+      },
+      responseType: 'blob',
+    },
+  )
+
+  return response.data
+}
