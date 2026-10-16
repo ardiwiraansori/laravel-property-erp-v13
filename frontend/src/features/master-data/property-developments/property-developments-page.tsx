@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { hasPermission, permissions } from '@/features/auth/permissions'
 import { useCompany } from '@/features/company/company-state'
-import { directoryUrlParams, directoryUrlSearch, readDirectoryUrlState } from '@/features/master-data/property-developments/directory-url'
+import { directoryUrlParams, directoryUrlSearch, isValidDirectoryDate, readDirectoryUrlState } from '@/features/master-data/property-developments/directory-url'
 import type { DirectoryPageSize } from '@/features/master-data/property-developments/directory-url'
 import {
   createPropertyDevelopment,
@@ -46,11 +46,16 @@ export function PropertyDevelopmentsPage() {
   const { activeCompany } = useCompany()
   const companyId = activeCompany?.id
   const [urlParams, setUrlParams] = useSearchParams()
-  const { search, status, page, perPage, sort } = readDirectoryUrlState(urlParams)
+  const { search, status, page, perPage, sort, createdFrom, createdTo } = readDirectoryUrlState(urlParams)
   // Keep a local draft so typing does not start a new request until Search.
   // Browser Back/Forward still refreshes the input from the applied URL filter.
   const [draftSearch, setDraftSearch] = useState({ applied: search, value: search })
   const searchInput = draftSearch.applied === search ? draftSearch.value : search
+  const appliedDatesKey = JSON.stringify([createdFrom, createdTo])
+  const [draftDates, setDraftDates] = useState({ applied: appliedDatesKey, from: createdFrom, to: createdTo })
+  const dateInputs = draftDates.applied === appliedDatesKey
+    ? draftDates : { applied: appliedDatesKey, from: createdFrom, to: createdTo }
+  const [dateError, setDateError] = useState<string | null>(null)
 
   const [developments, setDevelopments] = useState<PropertyDevelopment[]>([])
   const [meta, setMeta] = useState<DirectoryMeta | null>(null)
@@ -61,7 +66,7 @@ export function PropertyDevelopmentsPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
-  const queryKey = JSON.stringify([companyId, search, status, page, perPage, sort, revision])
+  const queryKey = JSON.stringify([companyId, search, status, page, perPage, sort, createdFrom, createdTo, revision])
   const showingLoading = isLoading || loadedKey !== queryKey
 
   const [code, setCode] = useState('')
@@ -94,7 +99,7 @@ export function PropertyDevelopmentsPage() {
 
     // Every query is associated with the currently resolved tenant. When it
     // changes, the old response must not update another tenant's directory.
-    void getPropertyDevelopmentDirectory({ page, perPage, search, status, sort })
+    void getPropertyDevelopmentDirectory({ page, perPage, search, status, sort, createdFrom, createdTo })
       .then((response) => {
         if (!current) return
         // Records may have been removed or filters may be shared with a stale
@@ -102,7 +107,7 @@ export function PropertyDevelopmentsPage() {
         // 'No matching' empty state. replace avoids polluting browser history.
         if (page > Math.max(1, response.meta.last_page)) {
           setEditing(null)
-          setUrlParams(directoryUrlParams({ search, status, page: Math.max(1, response.meta.last_page), perPage, sort }), { replace: true })
+          setUrlParams(directoryUrlParams({ search, status, page: Math.max(1, response.meta.last_page), perPage, sort, createdFrom, createdTo }), { replace: true })
           return
         }
         setDevelopments(response.data)
@@ -125,7 +130,7 @@ export function PropertyDevelopmentsPage() {
     return () => {
       current = false
     }
-  }, [companyId, page, perPage, revision, search, status, sort, queryKey, setUrlParams])
+  }, [companyId, page, perPage, revision, search, status, sort, createdFrom, createdTo, queryKey, setUrlParams])
 
   function beginEdit(development: PropertyDevelopment) {
     if (!canUpdate || isUpdating) return
@@ -176,7 +181,7 @@ export function PropertyDevelopmentsPage() {
     setExportError(null)
     try {
       // The server exports the entire filtered result (up to 1,000), not just this page.
-      const csv = await exportPropertyDevelopmentsCsv({ search, status, sort })
+      const csv = await exportPropertyDevelopmentsCsv({ search, status, sort, createdFrom, createdTo })
       const url = URL.createObjectURL(csv)
       try {
         const link = document.createElement('a')
@@ -204,7 +209,7 @@ export function PropertyDevelopmentsPage() {
     setEditing(null)
     setEditError(null)
     setIsLoading(true)
-    setUrlParams(directoryUrlParams({ search: searchInput.trim(), status, page: 1, perPage, sort }))
+    setUrlParams(directoryUrlParams({ search: searchInput.trim(), status, page: 1, perPage, sort, createdFrom, createdTo }))
     setRevision((value) => value + 1)
   }
 
@@ -212,7 +217,7 @@ export function PropertyDevelopmentsPage() {
     setEditing(null)
     setEditError(null)
     setIsLoading(true)
-    setUrlParams(directoryUrlParams({ search, status: value, page: 1, perPage, sort }))
+    setUrlParams(directoryUrlParams({ search, status: value, page: 1, perPage, sort, createdFrom, createdTo }))
   }
 
   function changePageSize(value: DirectoryPageSize) {
@@ -220,7 +225,7 @@ export function PropertyDevelopmentsPage() {
     setEditError(null)
     setIsLoading(true)
     // Switching page size resets the cursor, but keeps the applied filters.
-    setUrlParams(directoryUrlParams({ search, status, page: 1, perPage: value, sort }))
+    setUrlParams(directoryUrlParams({ search, status, page: 1, perPage: value, sort, createdFrom, createdTo }))
   }
 
   function changeSort(value: DirectorySort) {
@@ -228,7 +233,24 @@ export function PropertyDevelopmentsPage() {
     setEditError(null)
     setIsLoading(true)
     // Sorting applies to the whole filtered directory, not a single page.
-    setUrlParams(directoryUrlParams({ search, status, page: 1, perPage, sort: value }))
+    setUrlParams(directoryUrlParams({ search, status, page: 1, perPage, sort: value, createdFrom, createdTo }))
+  }
+
+  function applyDates(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const from = dateInputs.from
+    const to = dateInputs.to
+    if ((from !== '' && !isValidDirectoryDate(from)) ||
+        (to !== '' && !isValidDirectoryDate(to)) ||
+        (from !== '' && to !== '' && from > to)) {
+      setDateError('Enter valid dates with Created From not after Created To (UTC).')
+      return
+    }
+    setDateError(null)
+    setEditing(null)
+    setEditError(null)
+    setIsLoading(true)
+    setUrlParams(directoryUrlParams({ search, status, page: 1, perPage, sort, createdFrom: from, createdTo: to }))
   }
 
   function resetFilters() {
@@ -236,6 +258,8 @@ export function PropertyDevelopmentsPage() {
     setEditError(null)
     setIsLoading(true)
     setDraftSearch({ applied: '', value: '' })
+    setDraftDates({ applied: JSON.stringify(['', '']), from: '', to: '' })
+    setDateError(null)
     setUrlParams(new URLSearchParams())
     setRevision((value) => value + 1)
   }
@@ -346,6 +370,27 @@ export function PropertyDevelopmentsPage() {
                 <Download /> {isExporting ? 'Exporting...' : 'Export CSV'}
               </Button>
             </div>
+            <form onSubmit={applyDates} className="flex flex-wrap items-end gap-3" aria-label="Created date filters (UTC)">
+              <div className="space-y-1">
+                <Label htmlFor="development-created-from">Created From (UTC)</Label>
+                <Input id="development-created-from" type="date" value={dateInputs.from}
+                  onChange={(event) => {
+                    setDateError(null)
+                    setDraftDates({ applied: appliedDatesKey, from: event.target.value, to: dateInputs.to })
+                  }} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="development-created-to">Created To (UTC)</Label>
+                <Input id="development-created-to" type="date" value={dateInputs.to}
+                  onChange={(event) => {
+                    setDateError(null)
+                    setDraftDates({ applied: appliedDatesKey, from: dateInputs.from, to: event.target.value })
+                  }} />
+              </div>
+              <Button type="submit" variant="outline" disabled={showingLoading}>Apply dates</Button>
+              <p className="text-xs text-muted-foreground">Inclusive UTC calendar dates; leave either field blank for an open-ended range.</p>
+            </form>
+            {dateError ? <p role="alert" className="text-sm text-destructive">{dateError}</p> : null}
             <p className="text-xs text-muted-foreground">CSV exports all matching records (up to 1,000), not only the current page.</p>
             {exportError ? <p className="text-sm text-destructive" role="alert">{exportError}</p> : null}
 
@@ -382,7 +427,7 @@ export function PropertyDevelopmentsPage() {
                       <tr key={development.id} className="border-b last:border-0">
                         <td className="py-3 pr-4 font-mono text-xs font-medium">{development.code}</td>
                         <td className="py-3 pr-4">
-                          <Link to={`/master-data/property-developments/${development.id}${directoryUrlSearch({ search, status, page, perPage, sort })}`}
+                          <Link to={`/master-data/property-developments/${development.id}${directoryUrlSearch({ search, status, page, perPage, sort, createdFrom, createdTo })}`}
                             className="font-medium text-primary underline-offset-4 hover:underline focus-visible:underline">
                             {development.name}
                           </Link>
@@ -473,7 +518,7 @@ export function PropertyDevelopmentsPage() {
                     onClick={() => {
                       setEditing(null)
                       setIsLoading(true)
-                      setUrlParams(directoryUrlParams({ search, status, page: Math.max(1, page - 1), perPage, sort }))
+                      setUrlParams(directoryUrlParams({ search, status, page: Math.max(1, page - 1), perPage, sort, createdFrom, createdTo }))
                     }}
                   >Previous</Button>
                   <span className="text-muted-foreground">Page {meta.current_page} of {meta.last_page}</span>
@@ -485,7 +530,7 @@ export function PropertyDevelopmentsPage() {
                     onClick={() => {
                       setEditing(null)
                       setIsLoading(true)
-                      setUrlParams(directoryUrlParams({ search, status, page: page + 1, perPage, sort }))
+                      setUrlParams(directoryUrlParams({ search, status, page: page + 1, perPage, sort, createdFrom, createdTo }))
                     }}
                   >Next</Button>
                 </div>

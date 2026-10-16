@@ -10,6 +10,8 @@ export type DirectoryUrlState = {
   page: number
   perPage: DirectoryPageSize
   sort: DirectorySort
+  createdFrom: string
+  createdTo: string
 }
 
 export const DEFAULT_DIRECTORY_STATE: Readonly<DirectoryUrlState> = {
@@ -18,6 +20,27 @@ export const DEFAULT_DIRECTORY_STATE: Readonly<DirectoryUrlState> = {
   page: 1,
   perPage: 10,
   sort: 'name_asc',
+  createdFrom: '',
+  createdTo: '',
+}
+
+// Calendar-safe ISO dates. Date parsing rejects rollover days (e.g. Feb 30),
+// timezone suffixes and client-local time conversions. UTC is the API contract.
+export function isValidDirectoryDate(value: string): boolean {
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return false
+  const timestamp = Date.parse(`${value}T00:00:00.000Z`)
+  return Number.isFinite(timestamp)
+    && new Date(timestamp).toISOString().slice(0, 10) === value
+}
+
+function normalizeDateRange(from: string, to: string): { createdFrom: string; createdTo: string } {
+  const createdFrom = isValidDirectoryDate(from) ? from : ''
+  const createdTo = isValidDirectoryDate(to) ? to : ''
+  // An impossible shared range must never be sent as a 422 or broadened
+  // into a different one-sided range. Treat it as no date restriction.
+  return createdFrom && createdTo && createdFrom > createdTo
+    ? { createdFrom: '', createdTo: '' }
+    : { createdFrom, createdTo }
 }
 
 // Explicit bounds prevent oversized/unexpected query input from reaching the
@@ -38,7 +61,10 @@ export function readDirectoryUrlState(params: URLSearchParams): DirectoryUrlStat
   const sort: DirectorySort = rawSort === 'name_desc' || rawSort === 'code_asc' || rawSort === 'code_desc'
     || rawSort === 'created_desc' || rawSort === 'created_asc' ? rawSort : 'name_asc'
 
-  return { search, status, page, perPage, sort }
+  const { createdFrom, createdTo } = normalizeDateRange(
+    params.get('created_from') ?? '', params.get('created_to') ?? '',
+  )
+  return { search, status, page, perPage, sort, createdFrom, createdTo }
 }
 
 export function directoryUrlParams(state: DirectoryUrlState): URLSearchParams {
@@ -52,6 +78,9 @@ export function directoryUrlParams(state: DirectoryUrlState): URLSearchParams {
   if (state.perPage === 25 || state.perPage === 50) params.set('per_page', String(state.perPage))
   if (state.sort === 'name_desc' || state.sort === 'code_asc' || state.sort === 'code_desc'
     || state.sort === 'created_desc' || state.sort === 'created_asc') params.set('sort', state.sort)
+  const { createdFrom, createdTo } = normalizeDateRange(state.createdFrom, state.createdTo)
+  if (createdFrom) params.set('created_from', createdFrom)
+  if (createdTo) params.set('created_to', createdTo)
   return params
 }
 

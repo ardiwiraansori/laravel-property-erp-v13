@@ -31,6 +31,8 @@ export type PropertyDevelopmentDirectoryQuery = {
   search: string
   status: DirectoryStatus
   sort: DirectorySort
+  createdFrom: string
+  createdTo: string
 }
 
 export type DirectoryMeta = {
@@ -73,6 +75,8 @@ export async function getPropertyDevelopmentDirectory(query: PropertyDevelopment
         search: query.search || undefined,
         status: query.status,
         sort: query.sort,
+        created_from: query.createdFrom || undefined,
+        created_to: query.createdTo || undefined,
       },
     },
   )
@@ -114,7 +118,7 @@ export async function updatePropertyDevelopment(
 // Download uses the existing tenant-aware Axios instance and active directory filters.
 // It returns a Blob; browser download is initiated only by an explicit user click.
 export async function exportPropertyDevelopmentsCsv(
-  filters: Pick<PropertyDevelopmentDirectoryQuery, 'search' | 'status' | 'sort'>,
+  filters: Pick<PropertyDevelopmentDirectoryQuery, 'search' | 'status' | 'sort' | 'createdFrom' | 'createdTo'>,
 ): Promise<Blob> {
   const response = await api.get<Blob>(
     '/api/master-data/property-developments/export',
@@ -123,6 +127,8 @@ export async function exportPropertyDevelopmentsCsv(
         search: filters.search || undefined,
         status: filters.status,
         sort: filters.sort,
+        created_from: filters.createdFrom || undefined,
+        created_to: filters.createdTo || undefined,
       },
       responseType: 'blob',
     },
