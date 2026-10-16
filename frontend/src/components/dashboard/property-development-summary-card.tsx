@@ -90,9 +90,17 @@ export function PropertyDevelopmentSummaryCard({ companyId, companyName, canOpen
               <p className="text-sm text-muted-foreground">No property developments have been recorded for this company.</p>
             ) : null}
             {canOpenDirectory ? (
-              <Link to="/master-data/property-developments" className="inline-block text-sm font-medium underline underline-offset-4">
-                View property developments
-              </Link>
+              <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="Property development directory filters">
+                <Link to="/master-data/property-developments" className="font-medium text-primary underline-offset-4 hover:underline">
+                  View all developments
+                </Link>
+                <Link to="/master-data/property-developments?status=active" className="font-medium text-primary underline-offset-4 hover:underline">
+                  View active
+                </Link>
+                <Link to="/master-data/property-developments?status=inactive" className="font-medium text-primary underline-offset-4 hover:underline">
+                  View inactive
+                </Link>
+              </nav>
             ) : null}
           </>
         ) : null}

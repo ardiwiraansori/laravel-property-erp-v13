@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test:route-chunks": "node --test scripts/route-chunks.test.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:directory-links": "node --test scripts/directory-links.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

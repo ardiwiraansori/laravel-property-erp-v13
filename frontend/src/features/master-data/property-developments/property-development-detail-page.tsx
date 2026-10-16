@@ -1,10 +1,11 @@
 import axios from 'axios'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCompany } from '@/features/company/company-state'
+import { directoryUrlSearch, readDirectoryUrlState } from '@/features/master-data/property-developments/directory-url'
 import {
   getPropertyDevelopment,
   type PropertyDevelopmentDetail,
@@ -20,6 +21,8 @@ function formatDate(isoDate: string | null): string {
 
 export function PropertyDevelopmentDetailPage() {
   const { developmentId } = useParams<{ developmentId: string }>()
+  const location = useLocation()
+  const backToDirectory = `/master-data/property-developments${directoryUrlSearch(readDirectoryUrlState(new URLSearchParams(location.search)))}`
   const { activeCompany } = useCompany()
   const companyId = activeCompany?.id
   const [state, setState] = useState<LoadState>('loading')
@@ -64,7 +67,7 @@ export function PropertyDevelopmentDetailPage() {
     <div className="space-y-6">
       <div className="space-y-2">
         <Link className="text-sm text-primary underline-offset-4 hover:underline"
-          to="/master-data/property-developments">← Back to developments</Link>
+          to={backToDirectory}>← Back to developments</Link>
         <h1 className="text-2xl font-semibold tracking-tight">Development details</h1>
         <p className="text-sm text-muted-foreground">Read-only record in your active company.</p>
       </div>

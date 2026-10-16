@@ -2,7 +2,7 @@ import axios from 'axios'
 import { Download, Plus, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { hasPermission, permissions } from '@/features/auth/permissions'
 import { useCompany } from '@/features/company/company-state'
+import { directoryUrlParams, directoryUrlSearch, readDirectoryUrlState } from '@/features/master-data/property-developments/directory-url'
 import {
   createPropertyDevelopment,
   exportPropertyDevelopmentsCsv,
@@ -44,19 +45,24 @@ const PAGE_SIZE = 10
 export function PropertyDevelopmentsPage() {
   const { activeCompany } = useCompany()
   const companyId = activeCompany?.id
+  const [urlParams, setUrlParams] = useSearchParams()
+  const { search, status, page } = readDirectoryUrlState(urlParams)
+  // Keep a local draft so typing does not start a new request until Search.
+  // Browser Back/Forward still refreshes the input from the applied URL filter.
+  const [draftSearch, setDraftSearch] = useState({ applied: search, value: search })
+  const searchInput = draftSearch.applied === search ? draftSearch.value : search
 
   const [developments, setDevelopments] = useState<PropertyDevelopment[]>([])
   const [meta, setMeta] = useState<DirectoryMeta | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadedKey, setLoadedKey] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<DirectoryStatus>('all')
-  const [page, setPage] = useState(1)
+  const queryKey = JSON.stringify([companyId, search, status, page, revision])
+  const showingLoading = isLoading || loadedKey !== queryKey
 
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
@@ -102,13 +108,16 @@ export function PropertyDevelopmentsPage() {
         setLoadError('Unable to load property developments. Please try again.')
       })
       .finally(() => {
-        if (current) setIsLoading(false)
+        if (current) {
+          setLoadedKey(queryKey)
+          setIsLoading(false)
+        }
       })
 
     return () => {
       current = false
     }
-  }, [companyId, page, revision, search, status])
+  }, [companyId, page, revision, search, status, queryKey])
 
   function beginEdit(development: PropertyDevelopment) {
     if (!canUpdate || isUpdating) return
@@ -154,7 +163,7 @@ export function PropertyDevelopmentsPage() {
   }
 
   async function handleExport() {
-    if (isExporting || isLoading || !activeCompany) return
+    if (isExporting || showingLoading || !activeCompany) return
     setIsExporting(true)
     setExportError(null)
     try {
@@ -187,27 +196,23 @@ export function PropertyDevelopmentsPage() {
     setEditing(null)
     setEditError(null)
     setIsLoading(true)
-    setPage(1)
-    setSearch(searchInput.trim())
+    setUrlParams(directoryUrlParams({ search: searchInput.trim(), status, page: 1 }))
     setRevision((value) => value + 1)
   }
 
-  function changeStatus(value: DirectoryStatus) {
+  function changeStatus(value: 'all' | 'active' | 'inactive') {
     setEditing(null)
     setEditError(null)
     setIsLoading(true)
-    setPage(1)
-    setStatus(value)
+    setUrlParams(directoryUrlParams({ search, status: value, page: 1 }))
   }
 
   function resetFilters() {
     setEditing(null)
     setEditError(null)
     setIsLoading(true)
-    setSearchInput('')
-    setSearch('')
-    setStatus('all')
-    setPage(1)
+    setDraftSearch({ applied: '', value: '' })
+    setUrlParams(new URLSearchParams())
     setRevision((value) => value + 1)
   }
 
@@ -271,11 +276,11 @@ export function PropertyDevelopmentsPage() {
                     name="search"
                     value={searchInput}
                     maxLength={100}
-                    onChange={(event) => setSearchInput(event.target.value)}
+                    onChange={(event) => setDraftSearch({ applied: search, value: event.target.value })}
                     placeholder="Search developments"
                   />
                 </div>
-                <Button type="submit" variant="outline" disabled={isLoading}>
+                <Button type="submit" variant="outline" disabled={showingLoading}>
                   <Search /> Search
                 </Button>
               </form>
@@ -292,10 +297,10 @@ export function PropertyDevelopmentsPage() {
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
-              <Button type="button" variant="ghost" onClick={resetFilters} disabled={isLoading}>
+              <Button type="button" variant="ghost" onClick={resetFilters} disabled={showingLoading}>
                 Clear
               </Button>
-              <Button type="button" variant="outline" disabled={isLoading || isExporting}
+              <Button type="button" variant="outline" disabled={showingLoading || isExporting}
                 onClick={() => void handleExport()}>
                 <Download /> {isExporting ? 'Exporting...' : 'Export CSV'}
               </Button>
@@ -303,7 +308,7 @@ export function PropertyDevelopmentsPage() {
             <p className="text-xs text-muted-foreground">CSV exports all matching records (up to 1,000), not only the current page.</p>
             {exportError ? <p className="text-sm text-destructive" role="alert">{exportError}</p> : null}
 
-            {isLoading ? (
+            {showingLoading ? (
               <p className="text-sm text-muted-foreground" role="status">Loading property developments...</p>
             ) : loadError ? (
               <div className="space-y-3" role="alert">
@@ -336,7 +341,7 @@ export function PropertyDevelopmentsPage() {
                       <tr key={development.id} className="border-b last:border-0">
                         <td className="py-3 pr-4 font-mono text-xs font-medium">{development.code}</td>
                         <td className="py-3 pr-4">
-                          <Link to={`/master-data/property-developments/${development.id}`}
+                          <Link to={`/master-data/property-developments/${development.id}${directoryUrlSearch({ search, status, page })}`}
                             className="font-medium text-primary underline-offset-4 hover:underline focus-visible:underline">
                             {development.name}
                           </Link>
@@ -365,7 +370,7 @@ export function PropertyDevelopmentsPage() {
             {editError ? <p role="alert" className="text-sm text-destructive">{editError}</p> : null}
             {editSuccess ? <p role="status" className="text-sm">{editSuccess}</p> : null}
 
-            {canUpdate && editing ? (
+            {canUpdate && editing && !showingLoading && developments.some((item) => item.id === editing.id) ? (
               <form onSubmit={(event) => void saveEdit(event)}
                 className="space-y-3 rounded-lg border p-4" aria-label={`Edit ${editing.code}`}>
                 <div>
@@ -400,7 +405,7 @@ export function PropertyDevelopmentsPage() {
               </form>
             ) : null}
 
-            {!isLoading && !loadError && meta ? (
+            {!showingLoading && !loadError && meta ? (
               <div className="flex flex-col gap-2 border-t pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-muted-foreground" role="status">
                   Showing {firstItem}–{lastItem} of {meta.total} developments
@@ -411,7 +416,11 @@ export function PropertyDevelopmentsPage() {
                     variant="outline"
                     size="sm"
                     disabled={page <= 1}
-                    onClick={() => { setEditing(null); setIsLoading(true); setPage((value) => Math.max(1, value - 1)) }}
+                    onClick={() => {
+                      setEditing(null)
+                      setIsLoading(true)
+                      setUrlParams(directoryUrlParams({ search, status, page: Math.max(1, page - 1) }))
+                    }}
                   >Previous</Button>
                   <span className="text-muted-foreground">Page {meta.current_page} of {meta.last_page}</span>
                   <Button
@@ -419,7 +428,11 @@ export function PropertyDevelopmentsPage() {
                     variant="outline"
                     size="sm"
                     disabled={page >= meta.last_page}
-                    onClick={() => { setEditing(null); setIsLoading(true); setPage((value) => value + 1) }}
+                    onClick={() => {
+                      setEditing(null)
+                      setIsLoading(true)
+                      setUrlParams(directoryUrlParams({ search, status, page: page + 1 }))
+                    }}
                   >Next</Button>
                 </div>
               </div>
