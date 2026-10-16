@@ -2,16 +2,20 @@ import type { DirectoryStatus } from '@/features/master-data/property-developmen
 
 // URL state is purely navigational; server-side tenant and permissions are
 // always resolved from the authenticated company context, never from URL data.
+export type DirectoryPageSize = 10 | 25 | 50
+
 export type DirectoryUrlState = {
   search: string
   status: DirectoryStatus
   page: number
+  perPage: DirectoryPageSize
 }
 
 export const DEFAULT_DIRECTORY_STATE: Readonly<DirectoryUrlState> = {
   search: '',
   status: 'all',
   page: 1,
+  perPage: 10,
 }
 
 // Explicit bounds prevent oversized/unexpected query input from reaching the
@@ -25,8 +29,10 @@ export function readDirectoryUrlState(params: URLSearchParams): DirectoryUrlStat
     : 'all'
   const rawPage = params.get('page') ?? ''
   const page = /^[1-9][0-9]{0,5}$/.test(rawPage) ? Number(rawPage) : 1
+  const rawPageSize = params.get('per_page')
+  const perPage: DirectoryPageSize = rawPageSize === '25' ? 25 : rawPageSize === '50' ? 50 : 10
 
-  return { search, status, page }
+  return { search, status, page, perPage }
 }
 
 export function directoryUrlParams(state: DirectoryUrlState): URLSearchParams {
@@ -37,6 +43,7 @@ export function directoryUrlParams(state: DirectoryUrlState): URLSearchParams {
   if (Number.isSafeInteger(state.page) && state.page > 1 && state.page <= 999999) {
     params.set('page', String(state.page))
   }
+  if (state.perPage === 25 || state.perPage === 50) params.set('per_page', String(state.perPage))
   return params
 }
 

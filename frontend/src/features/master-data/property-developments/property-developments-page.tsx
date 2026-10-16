@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { hasPermission, permissions } from '@/features/auth/permissions'
 import { useCompany } from '@/features/company/company-state'
 import { directoryUrlParams, directoryUrlSearch, readDirectoryUrlState } from '@/features/master-data/property-developments/directory-url'
+import type { DirectoryPageSize } from '@/features/master-data/property-developments/directory-url'
 import {
   createPropertyDevelopment,
   exportPropertyDevelopmentsCsv,
@@ -40,13 +41,11 @@ type FieldErrors = {
   name?: string
 }
 
-const PAGE_SIZE = 10
-
 export function PropertyDevelopmentsPage() {
   const { activeCompany } = useCompany()
   const companyId = activeCompany?.id
   const [urlParams, setUrlParams] = useSearchParams()
-  const { search, status, page } = readDirectoryUrlState(urlParams)
+  const { search, status, page, perPage } = readDirectoryUrlState(urlParams)
   // Keep a local draft so typing does not start a new request until Search.
   // Browser Back/Forward still refreshes the input from the applied URL filter.
   const [draftSearch, setDraftSearch] = useState({ applied: search, value: search })
@@ -61,7 +60,7 @@ export function PropertyDevelopmentsPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
-  const queryKey = JSON.stringify([companyId, search, status, page, revision])
+  const queryKey = JSON.stringify([companyId, search, status, page, perPage, revision])
   const showingLoading = isLoading || loadedKey !== queryKey
 
   const [code, setCode] = useState('')
@@ -94,9 +93,17 @@ export function PropertyDevelopmentsPage() {
 
     // Every query is associated with the currently resolved tenant. When it
     // changes, the old response must not update another tenant's directory.
-    void getPropertyDevelopmentDirectory({ page, perPage: PAGE_SIZE, search, status })
+    void getPropertyDevelopmentDirectory({ page, perPage, search, status })
       .then((response) => {
         if (!current) return
+        // Records may have been removed or filters may be shared with a stale
+        // page. Redirect to a valid last page instead of displaying a false
+        // 'No matching' empty state. replace avoids polluting browser history.
+        if (page > Math.max(1, response.meta.last_page)) {
+          setEditing(null)
+          setUrlParams(directoryUrlParams({ search, status, page: Math.max(1, response.meta.last_page), perPage }), { replace: true })
+          return
+        }
         setDevelopments(response.data)
         setMeta(response.meta)
         setLoadError(null)
@@ -117,7 +124,7 @@ export function PropertyDevelopmentsPage() {
     return () => {
       current = false
     }
-  }, [companyId, page, revision, search, status, queryKey])
+  }, [companyId, page, perPage, revision, search, status, queryKey, setUrlParams])
 
   function beginEdit(development: PropertyDevelopment) {
     if (!canUpdate || isUpdating) return
@@ -196,7 +203,7 @@ export function PropertyDevelopmentsPage() {
     setEditing(null)
     setEditError(null)
     setIsLoading(true)
-    setUrlParams(directoryUrlParams({ search: searchInput.trim(), status, page: 1 }))
+    setUrlParams(directoryUrlParams({ search: searchInput.trim(), status, page: 1, perPage }))
     setRevision((value) => value + 1)
   }
 
@@ -204,7 +211,15 @@ export function PropertyDevelopmentsPage() {
     setEditing(null)
     setEditError(null)
     setIsLoading(true)
-    setUrlParams(directoryUrlParams({ search, status: value, page: 1 }))
+    setUrlParams(directoryUrlParams({ search, status: value, page: 1, perPage }))
+  }
+
+  function changePageSize(value: DirectoryPageSize) {
+    setEditing(null)
+    setEditError(null)
+    setIsLoading(true)
+    // Switching page size resets the cursor, but keeps the applied filters.
+    setUrlParams(directoryUrlParams({ search, status, page: 1, perPage: value }))
   }
 
   function resetFilters() {
@@ -341,7 +356,7 @@ export function PropertyDevelopmentsPage() {
                       <tr key={development.id} className="border-b last:border-0">
                         <td className="py-3 pr-4 font-mono text-xs font-medium">{development.code}</td>
                         <td className="py-3 pr-4">
-                          <Link to={`/master-data/property-developments/${development.id}${directoryUrlSearch({ search, status, page })}`}
+                          <Link to={`/master-data/property-developments/${development.id}${directoryUrlSearch({ search, status, page, perPage })}`}
                             className="font-medium text-primary underline-offset-4 hover:underline focus-visible:underline">
                             {development.name}
                           </Link>
@@ -410,7 +425,20 @@ export function PropertyDevelopmentsPage() {
                 <p className="text-muted-foreground" role="status">
                   Showing {firstItem}–{lastItem} of {meta.total} developments
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor="development-page-size" className="text-sm">Rows per page</Label>
+                  <select
+                    id="development-page-size"
+                    aria-label="Rows per page"
+                    value={perPage}
+                    disabled={showingLoading}
+                    onChange={(event) => changePageSize(Number(event.target.value) as DirectoryPageSize)}
+                    className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
                   <Button
                     type="button"
                     variant="outline"
@@ -419,7 +447,7 @@ export function PropertyDevelopmentsPage() {
                     onClick={() => {
                       setEditing(null)
                       setIsLoading(true)
-                      setUrlParams(directoryUrlParams({ search, status, page: Math.max(1, page - 1) }))
+                      setUrlParams(directoryUrlParams({ search, status, page: Math.max(1, page - 1), perPage }))
                     }}
                   >Previous</Button>
                   <span className="text-muted-foreground">Page {meta.current_page} of {meta.last_page}</span>
@@ -431,7 +459,7 @@ export function PropertyDevelopmentsPage() {
                     onClick={() => {
                       setEditing(null)
                       setIsLoading(true)
-                      setUrlParams(directoryUrlParams({ search, status, page: page + 1 }))
+                      setUrlParams(directoryUrlParams({ search, status, page: page + 1, perPage }))
                     }}
                   >Next</Button>
                 </div>
